@@ -1,0 +1,49 @@
+---
+title: "Exploration_and_Analysis"
+author: "LDL Anderegg"
+date: "10/16/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Exploring the implications of leaf PV curves for remote sensing of plant water content
+Preliminary data exploration and analysis design
+
+```{r import data}
+mb12 <- read.csv("data/Bartlett2012ELE.csv", header=T) # data from Bartlett 2012 ELE
+mb14w <- read.csv("data/Bartlett2014ELE_wild.csv") # data from Bartlett 2014 ELE wild plants
+mb14c <- read.csv("data/Bartlett2014ELE_S3crop.csv")
+```
+
+## We care about the actual raw Psi~100-RWC data, meaning we have to recalculate this from the PVcurve parameters
+Psi_leaf is Psi_turgor + Psi_osmotic.
+
+Psi_turgor = -1 * pi_o - mod_elast * R
+and 
+-1/Psi_osmotic = 1/pi_o - (1/pi_o)/(100-af) * R
+
+pi_o = osmotic potential @ full turgor
+af = apoplastic water fraction
+R = 100-RWC
+
+so
+Psi_osmotic = -1/((1/pi_o) - R*(1/pi_o)/(100-af))
+
+
+
+```{r translation functions, echo=FALSE}
+Psi_turgor <- function(RWC, pi_o, mod_elast, af){
+  RWCs <- (RWC-af*100)/(100-af*100) *100
+  Rs <- (100-RWCs)
+  Psi_turgor <- -1 * pi_o - mod_elast * Rs
+  return(Psi_turgor)
+} 
+# is it true that mod elasticity 
+
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
