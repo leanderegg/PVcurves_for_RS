@@ -50,6 +50,11 @@ Psi_turgor <- function(RWC, pi_o, mod_elast, af){
 
 
 
+``` {r quick look at how much RWC_tlp varies}
+
+hist(mb12$RWC_tlp, xlab="RWC at turgor loss point")
+```
+
 
 
 **Analyses for Raw Data **
@@ -57,7 +62,13 @@ For data sources with raw RWC~Psi data, we don't have to back out the curve from
 
 ``` {r load raw data sources}
 ## Holtzman et al. data from Harvard Forest
-hf <- read.csv("data/")
+hf <- read.csv("data/raw_RWC-Psi/Holtzman_HarvardForest_rawPVcurves_20200304.csv"
+)
 
+plot(WP~R, hf, ylab="Water Potential (MPa)", xlab="100 - % Relative Water Content", col=type)
+legend('bottomright', legend = c("Leaf","Leaf+Branch"), col=c(1,2), pch=1)
+abline(h=-1.68, lty=2)
+text(y=-2.1, x=3, "TLP\n(-1.68 MPa)")
+abline(lm(WP~0 + R, hf[which(hf$WP> -1.68),]), col="grey") # add the regression line, forcing it through WP=0 @ R=0
 
 ```
