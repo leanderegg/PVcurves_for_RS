@@ -13,9 +13,11 @@ knitr::opts_chunk$set(echo = TRUE)
 Preliminary data exploration and analysis design
 
 ```{r import data}
-mb12 <- read.csv("data/Bartlett2012ELE.csv", header=T) # data from Bartlett 2012 ELE
-mb14w <- read.csv("data/Bartlett2014ELE_wild.csv") # data from Bartlett 2014 ELE wild plants
-mb14c <- read.csv("data/Bartlett2014ELE_S3crop.csv")
+mb12 <- read.csv("data/params/Bartlett2012ELE.csv", header=T) # data from Bartlett 2012 ELE
+mb14w <- read.csv("data/params/Bartlett2014ELE_wild.csv") # data from Bartlett 2014 ELE wild plants
+mb14c <- read.csv("data/params/Bartlett2014ELE_S3crop.csv")
+
+qgar <- read.csv("data/params/Hahm_2018_Ecosphere_Quercusgarryana_20210115.csv")
 ```
 
 ## We care about the actual raw Psi~100-RWC data, meaning we have to recalculate this from the PVcurve parameters
@@ -41,9 +43,21 @@ Psi_turgor <- function(RWC, pi_o, mod_elast, af){
   Psi_turgor <- -1 * pi_o - mod_elast * Rs
   return(Psi_turgor)
 } 
-# is it true that mod elasticity 
+
 
 
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+
+
+**Analyses for Raw Data **
+For data sources with raw RWC~Psi data, we don't have to back out the curve from the parameter values, and can instead calculate it directly from observations
+
+``` {r load raw data sources}
+## Holtzman et al. data from Harvard Forest
+hf <- read.csv("data/")
+
+
+```
