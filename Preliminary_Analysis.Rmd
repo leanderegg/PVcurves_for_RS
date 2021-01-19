@@ -7,17 +7,39 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(RColorBrewer)
+library(dplyr)
+library(reshape2)
+mypal <- brewer.pal(n=8, "Set1")
+palette(mypal)
 ```
 
 ## Exploring the implications of leaf PV curves for remote sensing of plant water content
 Preliminary data exploration and analysis design
 
+
+
+*** Analysis of summary parameters ****
+Many of our datasets are just the summary parameters extracted from the leaf Pressure-Volume curves, rather than all of the raw measurements. From these, we're most interested in TLP (water potential at which leaf loses turgor and most leaf functioning stops) and RWC_tlp (the relative water content of the leaf at TLP)
+
 ```{r import data}
-mb12 <- read.csv("data/params/Bartlett2012ELE.csv", header=T) # data from Bartlett 2012 ELE
-mb14w <- read.csv("data/params/Bartlett2014ELE_wild.csv") # data from Bartlett 2014 ELE wild plants
+mb12raw <- read.csv("data/params/Bartlett2012ELE.csv", header=T) # data from Bartlett 2012 ELE
+  # make clean version with all rows with both TLP and RWC_tlp values
+mb12 <- mb12[which(mb12$TLP<0 & mb12$RWC_tlp>0),]
+  # relevel things so that empty levels don't use all my colors
+mb12$Biome <- relevel(mb12$Biome, ref="Temperate")
+mb12$Biome <- relevel(mb12$Biome, ref="TropicalDry")
+
+mb14wraw <- read.csv("data/params/Bartlett2014ELE_wild.csv") # data from Bartlett 2014 ELE wild plants
+mb14wraw <- mb14w %>% rename(TLPwet=TLP_WET_MPa, TLPdry=TLP_DRY_MPa, RWC_tlpwet=RWC_total_wet_percent, RWC_tlpdry = RWC_total_dry_percent)
+mb14w <- mb14wraw[which(mb14wraw$RWC_tlpwet>0),]
 mb14c <- read.csv("data/params/Bartlett2014ELE_S3crop.csv")
 
 qgar <- read.csv("data/params/Hahm_2018_Ecosphere_Quercusgarryana_20210115.csv")
+  # a number of empty rows came in at the end, so kill those
+qgar <- qgar[which(!is.na(qgar$Tree.ID)),]
+  # relevel the 'rehydration' column so it doesn't have an empty NA level
+qgar$Rehydration <- factor(qgar$Rehydration)
 ```
 
 ## We care about the actual raw Psi~100-RWC data, meaning we have to recalculate this from the PVcurve parameters
@@ -50,9 +72,60 @@ Psi_turgor <- function(RWC, pi_o, mod_elast, af){
 
 
 
-``` {r quick look at how much RWC_tlp varies}
+Exploratory visuals of four types of questions:
+1) do biomes/land cover types differ?
+2) how much does within-species seasonal adjustment matter?
+3) how much does method (measuring rehydrated leaves vs measuring unrehydrated leaves) matter?
+4) How appropriate is a linear fit for actual data?
 
-hist(mb12$RWC_tlp, xlab="RWC at turgor loss point")
+``` {r quick plots RWC~TLP}
+
+mypal1 <- brewer.pal(n=8, "Set1")
+mypal1light <- paste0(mypal1, "66")
+palette(mypal1light)
+
+
+plot(TLP~RWC_tlp, mb12, col=Biome, xlim=c(68,100), ylim=c(min(mb12$TLP,na.rm=T),0), pch=16, cex=.8, xlab="%RWC")
+mtext(side=3, "Global Meta-analysis")
+for(i in 1:nrow(mb12)){
+  lines(x=c(100,mb12$RWC_tlp[i]), y=c(0,mb12$TLP[i]), col=mb12$Biome[i])
+}
+legend('topleft', cex=.8, bty='n', legend = c("TropicalDry","Temperate"), pch=16, col=mypal1light[1:2])
+
+plot(TLPdry~RWC_tlpdry, mb14w, col=mypal[1], xlim=c(60,100), ylim=c(min(mb14w$TLPdry,na.rm=T),0), pch=16, cex=.8, ylab="TLP", xlab="%RWC")
+for(i in 1:nrow(mb14w)){
+  lines(x=c(100,mb14w$RWC_tlpdry[i]), y=c(0,mb14w$TLPdry[i]), col=paste0(mypal[1],"33"))
+}
+
+points(TLPwet~RWC_tlpwet, mb14w, col=mypal[2], pch=16, cex=.8)
+for(i in 1:nrow(mb14w)){
+  lines(x=c(100,mb14w$RWC_tlpwet[i]), y=c(0,mb14w$TLPwet[i]), col=paste0(mypal[2],"33"))
+}
+arrows(x0=mb14w$RWC_tlpwet, x1=mb14w$RWC_tlpdry, y0=mb14w$TLPwet, y1=mb14w$TLPdry, length = .05)
+legend('topleft', cex=.8, bty='n', legend = c("Dry Season","Wet Season"), pch=16, col=mypal1[1:2])
+mtext("Seasonal Adjustment")
+
+
+### Use the Quercus garyana dataset to look at how much rehydrating leaves before making PV curve measurements matters
+plot(TLP~RWC_tlp, qgar, col=Rehydration, ylim=c(-5,0),xlim=c(.50,1.00), pch=16, ylab="TLP", xlab="%RWC")
+for(i in 1:nrow(qgar)){
+  lines(x=c(1,qgar$RWC_tlp[i]), y=c(0,qgar$TLP[i]), col=qgar$Rehydration[i])
+}
+legend('topleft', legend=c("unrehydrated", 'rehydrated'), col=mypal[c(1,2)], pch=16)
+mtext("Method:Rehyd vs no rehyd")
+
+
+### Appropriateness of linear fit when you have actual data
+plot(WP~RWC, hf, ylab="Water Potential (MPa)", xlab="Relative Water Content", col=type)
+legend('topleft', legend = c("Leaf","Leaf+Branch"), col=c(1,2), pch=1)
+abline(h=-1.68, lty=2)
+text(y=-2.1, x=3, "TLP\n(-1.68 MPa)")
+for(i in unique(hf$sample)){
+  lines(WP~RWC, hf[which(hf$sample==i),], col=type)
+}
+abline(lm(WP~RWC, hf[which(hf$WP> -1.68),]), col="black")
+mtext("Linear Fit?")
+
 ```
 
 
