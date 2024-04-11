@@ -1,0 +1,182 @@
+---
+title: "Processing LMA and LDMC from TRY for PVCurves"
+author: "LDL Anderegg"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+
+
+```{r import TRY data}
+require(rtry)
+
+trydatall <- rtry_import("data/TRY_Traits/27764.txt")
+lookall <- rtry_explore(trydatall,DataID, DataName, TraitID, TraitName, sortBy = TraitID)
+View(lookall)
+
+```
+Ancillary data to keep:
+193 Vegetation type / Biome
+59 Latitude
+60 Longitude
+61 Altitude
+62 MAT
+80 MAP
+113 Reference/source
+6601 Sampling date
+213 Number of replicates
+327 Treatment: Exposition
+413 Plant developmental status / plant age / maturity / plant life stage
+846 Family
+```{r test}
+# testing out James' code
+Trait = data.frame(trydatall$ObsDataID,trydatall$AccSpeciesName, trydatall$StdValue, trydatall$DataName, trydatall$TraitID, trydatall$ErrorRisk)
+colnames(Trait) <- c('DataID','FullName','Value','DataName','TraitID','ErrorRisk')
+Trait = Trait[which(Trait$TraitID == 3117),]
+datatypes = unique(Trait$DataName)
+keeps = c("Leaf mass per area (LMA)")
+keeps = c("SLA: undefined if petiole in- or excluded")
+Trait = Trait[which(Trait$DataName %in% keeps),]
+Trait = Trait[which(!is.na(Trait$Value)),]
+Trait = Trait[which(Trait$FullName != "unknown"),]
+Trait = Trait[which(Trait$FullName != "Coffea arabica" & Trait$FullName != "Glycine max"),]
+keep = grepl('^\\w+\\s\\w+$', Trait$FullName)
+Trait = Trait[keep,]
+Trait <- Trait[which(Trait$ErrorRisk<5),]
+Trait <- Trait %>% distinct(FullName, Value)
+
+```
+
+``` {r clean TRY, include=F}
+trydata <- rtry_select_row(trydatall, TraitID>0 | DataID %in% c(59,60,61,62,80,113,193,6601,213,327,413,846))
+#TraitID <- unique(lookall$TraitID[which(lookall$TraitID>0)])[-11] # get my trait #s, less NA
+#SLA.to.exclude <- lookall$DataID[which(lookall$TraitID>0 & lookall$TraitID %in% c(47,710,3122,3468,3770))]
+#trydat.SLA <- rtry_exclude(trydata, DataID %in% c(54), baseOn = ObservtionID)
+
+trySLA <- rtry_select_row(input = trydata,getAncillary = TRUE, rmDuplicates = TRUE, TraitID %in% c(3115,3116,3117,3086,47,3122))
+#View(rtry_explore(trySLA, DataID, DataName, TraitID, TraitName, sortBy = TraitID))
+
+# get rid of min and max LDMC (and 'NIRS based' whatever that means)
+trySLA <- trySLA %>% filter(!DataID %in% c(4027, 4028,4215,7218,7219) ) # removes 1186 values
+
+# remove values with error risk >3 (33356 total rows of uncertain traits that are 3sd >spp/genus/fam mean)
+#View(rtry_explore(trySLA, TraitID, TraitName, sortBy = TraitID))
+
+trySLA <- trySLA %>% filter(is.na(ErrorRisk) | ErrorRisk<3)
+#View(rtry_explore(tmp, TraitID, TraitName, sortBy = TraitID))
+
+# recalculate LDMC for trait 54 (LWC= 1-LDMC)
+#trySLA$StdValue[which(trySLA$DataID==54)] # these don't look any different than real LDMCs...
+#plot(OrigValueStr~StdValue, trySLA[which(trySLA$DataID==54),], ylim=c(0,1))
+  #Aaaand they've definitely been fixed already. Both for units and 1-LWC
+
+
+# pivot wider
+num_SLA <- rtry_select_row(trySLA, complete.cases(TraitID) & complete.cases(StdValue))
+num_SLA <- rtry_select_col(num_SLA, ObservationID, AccSpeciesID, AccSpeciesName, TraitID, TraitName, StdValue, UnitName)
+
+# ancillary data to keep
+SLA_lat <- rtry_select_anc(trySLA, 59)
+SLA_lon <- rtry_select_anc(trySLA, 60)
+SLA_biom <- rtry_select_anc(trySLA, 193)
+SLA_devstatus <- rtry_select_anc(trySLA, 413)
+SLA_exp <- rtry_select_anc(trySLA, 327)
+# add it into the df
+num_SLA <- rtry_join_left(num_SLA, SLA_lat, baseOn = ObservationID)
+num_SLA <- rtry_join_left(num_SLA, SLA_lon, baseOn = ObservationID)
+num_SLA <- rtry_join_left(num_SLA, SLA_biom, baseOn = ObservationID)
+num_SLA <- rtry_join_left(num_SLA, SLA_devstatus, baseOn = ObservationID)
+num_SLA <- rtry_join_left(num_SLA, SLA_exp, baseOn = ObservationID)
+
+#pivot wider
+SLA_dirty <- rtry_trans_wider(num_SLA, names_from=c(TraitID, TraitName, UnitName), values_from = c(StdValue), values_fn=list(StdValue = mean))
+
+# rename LDMC and SWC
+colnames(SLA_dirty)[grep("47", colnames(SLA_dirty))] <- "LDMC"
+colnames(SLA_dirty)[grep("3122", colnames(SLA_dirty))] <- "SWC"
+#SLA_dirt <- SLA_dirty %>% select(-grep("47", colnames(SLA_dirty))) # clean out the LDMC that stayed around
+SLA_dirty$SLA <- apply(SLA_dirty[,grep("SLA", colnames(SLA_dirty))], MARGIN = 1,FUN = mean, na.rm=T)
+colnames(SLA_dirty)[6:8] <- c("Biome","Dev_Status","Treatment")
+
+# verify that SWC and LDMC are the same for all the 11347 obs that have both
+#swc <- (1/SLA_dirty$LDMC)-1
+#plot(swc[which(SLA_dirty$SWC>0)]~SLA_dirty$SWC[which(SLA_dirty$SWC>0)], xlab="SWC from TRY", ylab="SWC from LDMC")
+  # oh sweet baby jesus, those are not the same at all.
+
+# remove non-wild grown things
+
+trySLAexp <- rtry_select_row(trySLA, DataID == 327)
+trySLAexptbl <- rtry_explore(trySLAexp, DataID, DataName, OriglName, OrigValueStr)
+
+badconditions <- c("C","G","Herbarium","FACE",
+                   trySLAexptbl$OrigValueStr[grep("chamber",trySLAexptbl$OrigValueStr)],
+                   trySLAexptbl$OrigValueStr[grep("Chamber",trySLAexptbl$OrigValueStr)],
+                   trySLAexptbl$OrigValueStr[grep("house",trySLAexptbl$OrigValueStr)], 
+                   trySLAexptbl$OrigValueStr[grep("House",trySLAexptbl$OrigValueStr)], 
+                   trySLAexptbl$OrigValueStr[grep("pot",trySLAexptbl$OrigValueStr)])
+badconditions <- c("Herbarium","FACE") # Doesn't actually save any spp in the overall analysis
+SLA <- SLA_dirty %>% filter(!Treatment %in% badconditions) %>% select(-grep("[0-9]", colnames(SLA_dirty)))
+
+ # calcualte SWC from LDMC
+SLA$SWC_from_LDMC <- (1/SLA$LDMC) - 1
+
+hist(SLA$SWC_from_LDMC)
+hist(SLA$SWC)
+
+length(which(SLA$SWC==SLA$SWC_from_LDMC))
+length(which(round(SLA$SWC,1)==round(SLA$SWC_from_LDMC,1)))
+experiment <- which(SLA$SWC>0 & SLA$SWC_from_LDMC>0 & round(SLA$SWC_from_LDMC,1)> round(SLA$SWC,1)+.3)
+
+plot(SWC_from_LDMC~SWC, SLA[which(SLA$SWC>0),])
+ # oh sweet baby jesus, those are not the same at all.
+points(SWC_from_LDMC~SWC, SLA[which(round(SLA$SWC,1)==round(SLA$SWC_from_LDMC,1)),], col="blue")
+points(SWC_from_LDMC~SWC, SLA[experiment,], col="green")
+plot(SWC_from_LDMC~SWC, SLA[which(SLA$SWC>0),], log="xy")
+# doesn't work to exclude for some god forsaken reason
+# tried to remove non-field grown measurements
+
+                   
+
+#trySLA.cln <- rtry_exclude(trySLA, (DataID %in% 327) & (OrigValueStr %in% badconditions), baseOn = ObservtionID)
+
+```
+
+
+
+SWC = 1/LDMC - 1
+
+But in TRY there are 11347 with both LDMC and SWC, and they don't look the same.
+
+165 are exactly the same
+5348 are the same with rounding to 0.1 -> 4951 once removed 3sigma error risk
+5999 are quite different. -> 5692 once 3sig removed. That's still over half.
+
+Thoughts: 
+- Could be that some LDMC (the scaling high and low ones) are Min and Max values that skewed the average of an obs so they ARENT the exact same. *tested and not it
+- all the things on the off-diagonal in log-log space must be... different traits? not different units? *3sig error risk removes the off diagonal by an large
+- DataID 54 is maybe not real LDMC? OH! it's defo (1-LDMC). maybe that's part of it? (53k values!) *already corrected
+
+What remains are largely 3 diagonals, 1:1,LDMC 1:1.5ish SWC, smattering of v-low values for SWC
+- 
+
+It's possible that the weird highest diagonal is actually 1-LDMC. But the middle one is definitley something about definitions and is not 1-LDMC...
+
+
+
+```{r average TRY to spp, include=F}
+SLAspp <- SLA %>% group_by(AccSpeciesID, AccSpeciesName) %>% summarise(
+  nSLA = n(), SLA=mean(SLA, na.rm=T),
+  nLDMC = length(which(LDMC>0)), LDMC = mean(LDMC, na.rm=T),
+  nSWC = length(which(SWC>0)), SWC = mean(SWC, na.rm=T))
+  # 18,523 species with SLA data, 17892 after cleaning (18078 with greenhouse/growth chamber)
+  # 7797 spp with LDMC (7822 with GH/GC)
+  # 58 spp with SWC  (58 w/ GH/GC)
+SLAspp$SWC_from_LDMC <- (1/SLAspp$LDMC)-1
+
+write.csv(SLAspp, "TRY_SpeciesAverages_20230719.csv")
+```
