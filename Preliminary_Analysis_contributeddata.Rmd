@@ -545,6 +545,28 @@ fullfam <- fullspp %>% group_by(Family, Gymno.Angio) %>% summarise(TLP = -1*mean
 Still missing 68 families somehow, but will go back and fix those
 - part of this is that none of Megans Chinese spp have families yet after updating
 
+## END: Load, merge and clean data
+# __________________________________________________________
+
+
+
+
+
+
+# __________________________________________________________
+## BEGIN: Data Analysis
+
+data frame explainer:
+pvs.master: original 
+fullpvs: whole dataset, contributed and pulled from two meta-analyses, lost some metadata from the pvs.master
+
+#### Place for Yos to start playing with data
+
+```{r how does TLP differ}
+boxplot(TLP~T.S.L, fullpvs)
+
+```
+
 
 ## Saturated Water Content: How much water is there per dry mass ('SWC') vs m2 leaf area ('SWA')
 ``` {r Saturated water per mass vs area, echo=F, warnings=F }
@@ -557,6 +579,7 @@ boxplot(sat.gwat.m2~Biome, fullspp, las=2
         , xlab="", ylab=expression(paste("Sat g water per ",m^2," leaf area")))
 mtext(text=paste("# Species=",length(which(fullspp$sat.gwat.m2>0))), side=3,line = 0, adj = 0)
 
+boxplot(tlp)
 ```
 *Takehome*: LMA really really matters. \
 -Crops are the wettest and Med/Conifers driest saturated water content (SWC) per unit dry mass\
