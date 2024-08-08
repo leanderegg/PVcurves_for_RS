@@ -6,6 +6,8 @@
 #_________________________________________________________________________________
 ########### Example PV Curve Figures ##################################
 
+mypal1 <- brewer.pal(n=5,"Dark2")
+palette(mypal1)
 
 ######## . RWC PV curves #############
 quartz(width=4, height=4)
@@ -24,6 +26,24 @@ lines(y=c(-9,ecs$TLP[1]), x=rep((1-ecs$totRWCtlp[1])*100,2), col=1, lty=2, lwd=2
 lines(y=c(-9,ecs$TLP[nrow(ecs)]), x=rep((1-ecs$totRWCtlp[nrow(ecs)])*100,2), col=2, lty=2, lwd=2)
 #quartz.save("Results/RWC_PVcurve_example_RWCTLP_v1.pdf", type="pdf")
 
+
+
+######## . RWC instead of 1-R PV curves #############
+quartz(width=4, height=4)
+par(mgp=c(2.5,1,0), cex.lab=1.1, font.lab=1)
+plot(Psi~I((1-R)*100), ecs[which(ecs$Species=="Quercus douglasii"),], col=factor(Species), type="b", ylab=expression(paste(Psi," (MPa)")), xlab="Relative Water Content (RWC, %)", ylim=c(-8.5,0), yaxs="i")
+points(Psi~I((1-R)*100), ecs[which(ecs$Species!="Quercus douglasii"),], col=2, type="b")
+text(x=c(70, 65), y=c(-2.4,-7.2),labels = c("giant redwood","blue oak"), col=c(2,1))
+
+#quartz.save("Results/RWC_PVcurve_example_clean_v2.pdf", type="pdf")
+
+lines(y=ecs$TLP[1:2], x=c(-5,(ecs$totRWCtlp[1])*100), col=1, lwd=2)
+lines(y=ecs$TLP[c(nrow(ecs)-1, nrow(ecs))], x=c(-5,(ecs$totRWCtlp[nrow(ecs)])*100), col=2, lwd=2)
+
+#quartz.save("Results/RWC_PVcurve_example_TLP_v2.pdf", type="pdf")
+lines(y=c(-9,ecs$TLP[1]), x=rep((ecs$totRWCtlp[1])*100,2), col=1, lty=2, lwd=2)
+lines(y=c(-9,ecs$TLP[nrow(ecs)]), x=rep((ecs$totRWCtlp[nrow(ecs)])*100,2), col=2, lty=2, lwd=2)
+#quartz.save("Results/RWC_PVcurve_example_RWCTLP_v2.pdf", type="pdf")
 
 
 
@@ -100,3 +120,26 @@ mtext("% Variance Explained",side = 2, line=2.5, cex=1.1)
 legend(xpd=NA, x = 4.7, y=0.99, legend=rev(colnames(test.rand)), fill=rev(c(mypal[1:5], "white",mypal[6])), ncol=1, bty="n",  cex=1)
 
 
+######### SWC vs LMA ################
+
+quartz(width=4, height=4)
+par(mgp=c(2.5,1,0), cex.lab=1.2, font.lab=1, oma=c(0,1.5,0,0))
+plot(SWA~LMA, fullpvs, pch=16, col=factor(Gymno.Angio), log="xy", ylab="SWA \n(g H2O m-2)", xpd=NA)
+legend("bottomright", legend=c("Gymno","Angio"), pch=16, col=mypal[c(2,1)], bty="n", xpd=NA)
+#quartz.save("Results/SWC-LMA_v1.pdf", type="pdf")
+
+quartz(width=4, height=4)
+par(mgp=c(2.5,1,0), cex.lab=1.2, font.lab=1, oma=c(0,1.5,0,0))
+plot(water_loss.m2~LMA, fullpvs, pch=16, col=factor(Gymno.Angio), log="xy", ylab="TWL g water m-2\n(sat to TLP)", xpd=NA)
+#legend("bottomright", legend=c("Gymno","Angio"), pch=16, col=mypal[c(2,1)], bty="n", xpd=NA)
+quartz.save("Results/TWL-LMA_v1.pdf", type="pdf")
+
+
+quartz(width=4, height=4)
+par(mgp=c(2.5,1,0), cex.lab=1.2, font.lab=1, oma=c(0,1.5,0,0))
+plot(CFT.g.m2~LMA, fullpvs, pch=16, col=factor(Gymno.Angio), log="xy", ylab=expression(paste(C[T]," (g*",MPa^-1,"*",m^-2,")")), xpd=NA)
+abline(lm(log(CFT.g.m2,base=10)~I(log(LMA,base=10)), fullpvs[which(fullpvs$Gymno.Angio=="Gymnosperm"),]), lwd=2, col=2)
+abline(lm(log(CFT.g.m2, base=10)~I(log(LMA,base=10)), fullpvs[which(fullpvs$Gymno.Angio=="Angiosperm"),]), lwd=2, col=1, lty=2)
+
+#legend("bottomright", legend=c("Gymno","Angio"), pch=16, col=mypal[c(2,1)], bty="n", xpd=NA)
+quartz.save("Results/CFT-LMA_v1.pdf", type="pdf")

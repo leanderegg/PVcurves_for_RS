@@ -24,25 +24,26 @@ library(MuMIn)
 ## The Contributed Dataset:
 
 ``` {r import contributed data, echo=F}
-pvs <- read.csv("data/ContributedData/PV_for_RS_metaanalysis_20231121.csv", header=T, na.strings = "", )
+
   # download protocol: Download from Google Drive, name xlsx version. Remove rows 1,2, and 4 and save as versioned .csv.
+
+# first round of data submissions
+pvs1 <- read.csv("data/ContributedData/PV_for_RS_metaanalysis_contributedby2023.12.15.csv", header=T, na.strings = "", )
+# clean out extra rows and extra columns
+pvs1 <- pvs1[which(!is.na(pvs1$Contributor)),-grep("^X", colnames(pvs1))]
+#pvs <- read.csv("data/ContributedData/PV_for_RS_metaanalysis_20231121.csv", header=T, na.strings = "", )
 #pvs <- read.csv("data/ContributedData/PV_for_RS_metaanalysis_20220716.csv", header=T, na.strings = "", )
-#pvs <- pvs[,-c(37:49)] # kills some extra columns that come in
-#pvs <- pvs[-which(is.na(pvs$Species)),] # kills some extra rows that came in
-# rename columns to be more code friendly
-# colnames(pvs) <- c("Contributor","Species","Treatment","Co.auth"
-#                    ,"Biome","Growth.Form","T.S.L","Ever.Decid"
-#                    ,"Wild.Garden","Life.Stage"
-#                    ,"TLP","TLS.sd","TLP.se"
-#                    , "totRWCtlp", "totRWCtlp.sd","totRWCtlp.se"
-#                    , "LMA", "SWC","CFT.mol.m2","Po","E","ApoFrac"
-#                    ,"sympRWCtlp","Psi.PD","Psi.min","Lat","Lon", "Elev"
-#                    ,"Site.Name","Rehydrated","Month","Year","OtherEnv"
-#                    ,"Methods.Notes","Ref","Other.Notes")
+
+# second round of data submissions
+pvs2 <- read.csv("data/ContributedData/PV_for_RS_metaanalysis_2024datacontributions_202400807.csv", header=T, na.strings = "", )[-c(2:5),] # get rid of first 4 demo rows
+# clean out extra rows
+pvs2 <- pvs2[which(!is.na(pvs2$Contributor)),-grep("^X", colnames(pvs2))]
+
+
 
 # rename the column names to get rid of weird characters and stuff
-colnames(pvs) <- c("Contributor","Species","Treatment","Co.auth"
-                   ,"Biome","Growth.Form","T.S.L","Ever.Decid"
+colnames(pvs1) <- c("Contributor","Species","Treatment","Co.auth"
+                   ,"Biome","Growth.Form","T.S.L.H","Ever.Decid"
                    ,"Wild.Garden","Life.Stage"
                    ,"TLP","TLS.sd","TLP.se"
                    , "totRWCtlp", "totRWCtlp.sd","totRWCtlp.se"
@@ -53,12 +54,41 @@ colnames(pvs) <- c("Contributor","Species","Treatment","Co.auth"
                    ,"Site.Name","Rehydrated","Month","Year","OtherEnv"
                    ,"Methods.Notes","Ref","Other.Notes")
 
+colnames(pvs2) <- c("Contributor","Species","Treatment","Co.auth"
+                   ,"Biome","Growth.Form","T.S.L.H","Ever.Decid"
+                   ,"Wild.Garden","Life.Stage"
+                   ,"TLP","TLS.sd","TLP.se"
+                   , "totRWCtlp", "totRWCtlp.sd","totRWCtlp.se"
+                   , "LMA", "LMA.sd","LMA.se"
+                   ,"SWC", "SWC.sd", "SWC.se"
+                   ,"CFT.mol.m2","CFT.sd","CFT.se","Po","E","ApoFrac"
+                   ,"sympRWCtlp","Psi.PD","Psi.min","Lat","Lon", "Elev"
+                   ,"Site.Name","Rehydrated","Month","Year","OtherEnv"
+                   ,"Methods.Notes","Ref","Other.Notes")
+
+# combine submission batches
+pvs <- rbind(pvs1, pvs2)
+pvs$LMA <- as.numeric(pvs$LMA)
+pvs$Lat <- as.numeric(pvs$Lat)
+pvs$Lon <- as.numeric(pvs$Lon)
+
+
+
 # fix LMA values that are in g cm2
 pvs$LMA[which(pvs$LMA<1)] <- pvs$LMA[which(pvs$LMA<1)] * 100 * 100
 # fix expanded Biomes
 pvs$Biome[which(pvs$Biome=="TemperateConifer (but could be montane conifer…)")] <- "TemperateConifer"
+pvs$Biome[which(pvs$Biome=="semiarid grassland (MAP 397 mm, MAT 8 C)")] <- "Grassland"
+pvs$Biome[which(pvs$Biome=="Tropical montane cloud forest")] <- "TropicalMoist"
+pvs$Biome[which(pvs$Biome=="Crop ")] <- "Crop"
+pvs$Biome[which(pvs$Biome=="Coastal")] <- "Med/TempDry"
+
+
 pvs$Life.Stage[which(pvs$Life.Stage=="Se (but see Age column)")] <- "Se" # making 3yr olds into seedlings (<1.3m tall)
 pvs$Ever.Decid[which(pvs$Ever.Decid=="Dd/Semi-Deciduous")] <- "DD" # currenlty calling semi-deciduous full drought deciduous
+
+# fix T.S.L.H before I added herbaceous
+pvs$T.S.L.H[which(pvs$Growth.Form=="H")] <- "H"
 
 
 # fix TLPs that are positive rather than negative
@@ -107,13 +137,14 @@ Danielle Ulrich - apoplastic fractions >1, German Vargas - Species with crazy to
 
 
 
+
 ``` {r calculate some desired quantities}
 # calculate the g of h20 per m2 of leaf area at full saturation
-pvs$sat.gwat.m2 <- pvs$SWC * pvs$LMA
+pvs$SWA <- pvs$SWC * pvs$LMA
 # calculate the g of h20 per m2 leaf area at tlp
-pvs$tlp.gwat.m2 <-pvs$sat.gwat.m2 * pvs$totRWCtlp /100
+pvs$LWAtlp <-pvs$SWA * pvs$totRWCtlp /100
 # calculate the water lost per m2 leaf area between saturation and tlp
-pvs$water_loss.m2 <- with(pvs, sat.gwat.m2 - tlp.gwat.m2)
+pvs$water_loss.m2 <- with(pvs, SWA - LWAtlp)
 # turn capacitance into g instead of mol
 pvs$CFT.g.m2 <- pvs$CFT.mol.m2 * 18.01528
   #NOTE: Some of these are VERY different than calcualting it myself... (water_loss.m2/(-1*TLP))
@@ -149,7 +180,7 @@ No real representation outside of the Americas at present.
 
 Number of entries with complete trait values:
 ```{r more summaries, echo=FALSE}
-apply(pvs %>% select(TLP,totRWCtlp,LMA,SWC,CFT.mol.m2,water_loss.m2,CFT.g.m2,CFT.g.m2_mycalc)
+apply(pvs %>% select(TLP,totRWCtlp,LMA,SWC,SWA,LWAtlp,CFT.mol.m2,water_loss.m2,CFT.g.m2,CFT.g.m2_mycalc)
       , MARGIN = 2
       ,FUN = function(x){length(which(!is.na(x)))})
 ```
@@ -161,8 +192,9 @@ apply(pvs %>% select(TLP,totRWCtlp,LMA,SWC,CFT.mol.m2,water_loss.m2,CFT.g.m2,CFT
 
 -**water_loss.m2** = total g water lost per m2 leaf area going from full sutration to TLP (calculated above)
 
+-**SWA** = g water per m2 leaf at full saturation
 
-
+-**LWCtlp** = g water per m2 leaf area at TLP (LWA at TLP)
 
 
 
@@ -217,6 +249,8 @@ ecs$g_h20_m2 <- ecs$Mass_h2o/ecs$Fresh_area_m2 # calculate the total water per m
 ```{r adding SLA, include=F}
 #read in TRY species averages (from Cd-TRY_LMALDMC_processing)
 SLAspp <- read.csv("DerivedData/TRY_SpeciesAverages_20230719.csv", header=T, row.names =1 )
+
+
 # add a SLA column from TRY
 mb12$SLA <- SLAspp$SLA[match(mb12$Species, SLAspp$AccSpeciesName)] # fills in 50 spp
 # add a column to keep track of which traits got imputed from TRY
@@ -248,7 +282,7 @@ mb14c$SWC_imputed <- 1
 # clean up the columns to get ready to merge
 mb12clean <- mb12 %>% filter(TLP<0 & RWC_tlp>0 & LMA>0 & SWC>0) %>% select(Species, Biome, "Growth.Form"=GrowthForm, "Ever.Decid"=Ever_Decid, TLP, "totRWCtlp"=RWC_tlp, LMA, SWC,"Po"=Pot_osmot,"E"=Mod_elast,"ApoFrac"=Apo_frac,"sympRWCtlp"=RWC_symp_tlp,"Ref"=Reference, LMA_imputed, SWC_imputed)
 mb12clean$Treatment <- NA
-mb12clean$T.S.L <- NA
+mb12clean$T.S.L.H <- NA
 mb12clean$Wild.Garden <- NA
 mb12clean$Life.Stage <- NA
 mb12clean$Psi.PD <- NA
@@ -258,11 +292,11 @@ mb12clean$Lat <- NA
 mb12clean$Lon <- NA
 mb12clean$Elev <- NA
 # calculate the g of h20 per m2 of leaf area at full saturation
-mb12clean$sat.gwat.m2 <- mb12clean$SWC * mb12clean$LMA
+mb12clean$SWA <- mb12clean$SWC * mb12clean$LMA
 # calculate the g of h20 per m2 leaf area at tlp
-mb12clean$tlp.gwat.m2 <-mb12clean$sat.gwat.m2 * mb12clean$totRWCtlp /100
+mb12clean$LWAtlp <-mb12clean$SWA * mb12clean$totRWCtlp /100
 # calculate the water lost per m2 leaf area between saturation and tlp
-mb12clean$water_loss.m2 <- with(mb12clean, sat.gwat.m2 - tlp.gwat.m2)
+mb12clean$water_loss.m2 <- with(mb12clean, SWA - LWAtlp)
 # calculate capacitance, g H2o m-2 MPa-1
 mb12clean$CFT.g.m2 <- mb12clean$water_loss.m2/(-1*mb12clean$TLP) #mb12clean$CFT.mol.m2 * 18.01528
 mb12clean$Other.Notes <- NA
@@ -283,7 +317,7 @@ mb14wc <- rbind(mb14wwet, mb14wdry)
 mb14wc$ApoFrac <- NA
 mb14wc$sympRWCtlp <- NA
 mb14wc$Treatment <- NA
-mb14wc$T.S.L <- NA
+mb14wc$T.S.L.H <- NA
 mb14wc$Wild.Garden <- NA
 mb14wc$Life.Stage <- NA
 mb14wc$Psi.PD <- NA
@@ -291,11 +325,11 @@ mb14wc$Psi.min <- NA
 mb14wc$Rehydrated <- NA
 mb14wc$Elev <- NA
 # calculate the g of h20 per m2 of leaf area at full saturation
-mb14wc$sat.gwat.m2 <- mb14wc$SWC * mb14wc$LMA
+mb14wc$SWA <- mb14wc$SWC * mb14wc$LMA
 # calculate the g of h20 per m2 leaf area at tlp
-mb14wc$tlp.gwat.m2 <-mb14wc$sat.gwat.m2 * mb14wc$totRWCtlp /100
+mb14wc$LWAtlp <-mb14wc$SWA * mb14wc$totRWCtlp /100
 # calculate the water lost per m2 leaf area between saturation and tlp
-mb14wc$water_loss.m2 <- with(mb14wc, sat.gwat.m2 - tlp.gwat.m2)
+mb14wc$water_loss.m2 <- with(mb14wc, SWA - LWAtlp)
 # calculate capacitance, g H2o m-2 MPa-1
 mb14wc$CFT.g.m2 <- mb14wc$water_loss.m2/(-1*mb14wc$TLP) #mb14wc$CFT.mol.m2 * 18.01528
 mb14wc$Other.Notes <- NA
@@ -315,7 +349,7 @@ mb14cc <- rbind(mb14cwet, mb14cdry)
 mb14cc$ApoFrac <- NA
 mb14cc$sympRWCtlp <- NA
 mb14cc$Treatment <- NA
-mb14cc$T.S.L <- NA
+mb14cc$T.S.L.H <- NA
 mb14cc$Wild.Garden <- NA
 mb14cc$Life.Stage <- NA
 mb14cc$Psi.PD <- NA
@@ -325,11 +359,11 @@ mb14cc$Lat <- NA
 mb14cc$Lon <- NA
 mb14cc$Elev <- NA
 # calculate the g of h20 per m2 of leaf area at full saturation
-mb14cc$sat.gwat.m2 <- mb14cc$SWC * mb14cc$LMA
+mb14cc$SWA <- mb14cc$SWC * mb14cc$LMA
 # calculate the g of h20 per m2 leaf area at tlp
-mb14cc$tlp.gwat.m2 <-mb14cc$sat.gwat.m2 * mb14cc$totRWCtlp /100
+mb14cc$LWAtlp <-mb14cc$SWA * mb14cc$totRWCtlp /100
 # calculate the water lost per m2 leaf area between saturation and tlp
-mb14cc$water_loss.m2 <- with(mb14cc, sat.gwat.m2 - tlp.gwat.m2)
+mb14cc$water_loss.m2 <- with(mb14cc, SWA - LWAtlp)
 # calculate capacitance, g H2o m-2 MPa-1
 mb14cc$CFT.g.m2 <- mb14cc$water_loss.m2/(-1*mb14cc$TLP) #mb14cc$CFT.mol.m2 * 18.01528
 mb14cc$Dataset <- "mb14"
@@ -354,12 +388,12 @@ pvs.master$LMA[which(is.na(pvs.master$LMA))] <- 1/SLAspp$SLA[match(pvs.master$Sp
 pvs.master$SWC_imputed[which(is.na(pvs.master$SWC))] <- 1
 pvs.master$SWC[which(is.na(pvs.master$SWC))] <- SLAspp$SWC_from_LDMC[match(pvs.master$Species[which(is.na(pvs.master$SWC))], SLAspp$AccSpeciesName)]
 # fill in missing values with imputed traits
-pvs.master$sat.gwat.m2 <- pvs.master$SWC * pvs.master$LMA 
-#length(which(is.na(pvs$sat.gwat.m2)& pvs.master$sat.gwat.m2>0))# fills in 160 values for all three of these
+pvs.master$SWA <- pvs.master$SWC * pvs.master$LMA 
+#length(which(is.na(pvs$SWA)& pvs.master$SWA>0))# fills in 160 values for all three of these
 # calculate the g of h20 per m2 leaf area at tlp
-pvs.master$tlp.gwat.m2 <-pvs.master$sat.gwat.m2 * pvs.master$totRWCtlp /100
+pvs.master$LWAtlp <-pvs.master$SWA * pvs.master$totRWCtlp /100
 # calculate the water lost per m2 leaf area between saturation and tlp
-pvs.master$water_loss.m2 <- with(pvs.master, sat.gwat.m2 - tlp.gwat.m2)
+pvs.master$water_loss.m2 <- with(pvs.master, SWA - LWAtlp)
 # calculate the Capacitance (CFT) for 83 rows without it
 pvs.master$CFT.g.m2[which(is.na(pvs.master$CFT.g.m2))] <- pvs.master$water_loss.m2[which(is.na(pvs.master$CFT.g.m2))]/(-1*pvs.master$TLP[which(is.na(pvs.master$CFT.g.m2))])
 
@@ -399,7 +433,7 @@ So we've got a ton of coverage in the Americas, and remarkably good spp coverage
 
 ``` {r average to spp, include=F}
 
-fullpvs$Ever.Decid[which(fullpvs$Growth.Form=="H")] <- "H" # call anything that's not woody H for ever/decid because it's hard to tell for perrenials and grasses and stuff. There are some E's and some "H"s (inherited from mb12).
+fullpvs$Ever.Decid[which(fullpvs$Growth.Form=="H" & is.na(fullpvs$Ever.Decid))] <- "H" # call anything that's not woody H for ever/decid because it's hard to tell for perrenials and grasses and stuff. There are some E's and some "H"s (inherited from mb12).
 fullpvs$Ever.Decid[which(fullpvs$Species=="Celtis australis")] <- "CD" # just D in mb12
 fullpvs$Ever.Decid[which(fullpvs$Species=="Cordia collococca")] <- "DD" # just D in mb12
 fullpvs$Biome[which(fullpvs$Species=="Cordia collococca")] <- "TropicalMoist" # both Dry and Moist
@@ -429,12 +463,12 @@ fullspp <- fullpvs %>% group_by(Species, Biome, Growth.Form, Ever.Decid) %>% sum
                                                                                                    LMA_imputed = max(LMA_imputed),
                                                                                                    SWC_imputed = max(SWC_imputed),
                                                                                                    ApoFrac = mean(ApoFrac, na.rm=T),
-                                                                                                   sat.gwat.m2 = mean(sat.gwat.m2, na.rm=T),
-                                                                                                   tlp.gwat.m2 = mean(tlp.gwat.m2, na.rm=T),
+                                                                                                   SWA = mean(SWA, na.rm=T),
+                                                                                                   LWAtlp = mean(LWAtlp, na.rm=T),
                                                                                                    water_loss.m2 = mean(water_loss.m2, na.rm=T),
                                                                                                    CFT.g.m2 = mean(CFT.g.m2, na.rm=T),
   water_loss.g = mean(water_loss.g, na.rm=T),
-                                                                                                   n_vals = n(), nDatasets=n_distinct(Dataset), Dataset = unique(Dataset)[1], T.S.L = unique(na.omit(T.S.L))[1]
+                                                                                                   n_vals = n(), nDatasets=n_distinct(Dataset), Dataset = unique(Dataset)[1], T.S.L.H = unique(na.omit(T.S.L.H))[1]
                                                                                      )
 
 fullspp <- fullspp[which(!is.na(fullspp$Species)),] 
@@ -532,8 +566,8 @@ fullfam <- fullspp %>% group_by(Family, Gymno.Angio) %>% summarise(TLP = -1*mean
                                                                                                    LMA_imputed = max(LMA_imputed),
                                                                                                    SWC_imputed = max(SWC_imputed),
                                                                                                    ApoFrac = mean(ApoFrac, na.rm=T),
-                                                                                                   sat.gwat.m2 = mean(sat.gwat.m2, na.rm=T),
-                                                                                                   tlp.gwat.m2 = mean(tlp.gwat.m2, na.rm=T),
+                                                                                                   SWA = mean(SWA, na.rm=T),
+                                                                                                   LWAtlp = mean(LWAtlp, na.rm=T),
                                                                                                    water_loss.m2 = mean(water_loss.m2, na.rm=T),
                                                                                                    CFT.g.m2 = mean(CFT.g.m2, na.rm=T),
   water_loss.g = mean(water_loss.g, na.rm=T),                                                       n_vals = n()  )
@@ -542,7 +576,7 @@ fullfam <- fullspp %>% group_by(Family, Gymno.Angio) %>% summarise(TLP = -1*mean
 
 ```
 
-Still missing 68 families somehow, but will go back and fix those
+Still missing 160 families somehow, but will go back and fix those
 - part of this is that none of Megans Chinese spp have families yet after updating
 
 
@@ -553,9 +587,9 @@ boxplot(SWC~Biome, fullspp, las=2
         , xlab="", ylab=expression(paste("Sat g water per g dry mass")))
 mtext(text=paste("# Species=",length(which(fullspp$SWC>0))), side=3,line = 0, adj = 0)
 
-boxplot(sat.gwat.m2~Biome, fullspp, las=2
+boxplot(SWA~Biome, fullspp, las=2
         , xlab="", ylab=expression(paste("Sat g water per ",m^2," leaf area")))
-mtext(text=paste("# Species=",length(which(fullspp$sat.gwat.m2>0))), side=3,line = 0, adj = 0)
+mtext(text=paste("# Species=",length(which(fullspp$SWA>0))), side=3,line = 0, adj = 0)
 
 ```
 *Takehome*: LMA really really matters. \
@@ -565,7 +599,7 @@ mtext(text=paste("# Species=",length(which(fullspp$sat.gwat.m2>0))), side=3,line
 
 ``` {r raw}
 
-ggplot(fullspp, aes(x=SWC,y=sat.gwat.m2, col=Biome)) +  xlab("Sat g water per g dry mass\nMass Basis") + ylab("Sat g water per m2\nArea Basis") + geom_point(data=fullpvs) + geom_point(col="#00000066") + ggtitle("All Obs, raw") + facet_wrap(~Gymno.Angio)
+ggplot(fullspp, aes(x=SWC,y=SWA, col=Biome)) +  xlab("Sat g water per g dry mass\nMass Basis") + ylab("Sat g water per m2\nArea Basis") + geom_point(data=fullpvs) + geom_point(col="#00000066") + ggtitle("All Obs, raw") + facet_wrap(~Gymno.Angio)
 ```
 \
 black points = spp means, colored points = all obs
@@ -575,10 +609,10 @@ black points = spp means, colored points = all obs
 ### log-log relationships
 
 ``` {r continued SWC on mass vs area basis}
-ggplot(fullspp, aes(x=log(SWC, base=10),y=log(sat.gwat.m2,base=10), col=Biome)) +  xlab("log10 Sat g water per g dry mass\nMass Basis") + ylab("log10 Sat g water per m2\nArea Basis") + geom_smooth(method="lm", se=F) + #geom_point(data=fullpvs) + 
+ggplot(fullspp, aes(x=log(SWC, base=10),y=log(SWA,base=10), col=Biome)) +  xlab("log10 Sat g water per g dry mass\nMass Basis") + ylab("log10 Sat g water per m2\nArea Basis") + geom_smooth(method="lm", se=F) + #geom_point(data=fullpvs) + 
   geom_point() + ggtitle("Spp means, log-log")
 
-#ggplot(pvs, aes(x=log(LMA),y=log(sat.gwat.m2), col=Biome)) + geom_point() + xlab("log(LMA)") + ylab("log(g water per m2 leaf)")
+#ggplot(pvs, aes(x=log(LMA),y=log(SWA), col=Biome)) + geom_point() + xlab("log(LMA)") + ylab("log(g water per m2 leaf)")
 
 #ggplot(pvs, aes(x=LMA,y=SWC, col=Biome)) + geom_point() + xlab("LMA") + ylab("g water per m2 leaf")
 ```
@@ -591,27 +625,27 @@ ggplot(fullspp, aes(x=log(SWC, base=10),y=log(sat.gwat.m2,base=10), col=Biome)) 
 mypal <- brewer.pal(n=8, "Dark2")
 palette(mypal)
 par(mar=c(6,6,2,1))
-plot(sat.gwat.m2~SWC, fullpvs, pch=16, col="grey", log="xy", ylab="Sat g water per m2\nArea Basis", xlab="Sat g Water per g dry mass\nMass Basis")
+plot(SWA~SWC, fullpvs, pch=16, col="grey", log="xy", ylab="Sat g water per m2\nArea Basis", xlab="Sat g Water per g dry mass\nMass Basis")
 palette(mypal)
-points(sat.gwat.m2~SWC, fullspp, pch=1, col=factor(Gymno.Angio))
-points(sat.gwat.m2~SWC, fullfam, pch=16, col=factor(Gymno.Angio))
+points(SWA~SWC, fullspp, pch=1, col=factor(Gymno.Angio))
+points(SWA~SWC, fullfam, pch=16, col=factor(Gymno.Angio))
 legend('topleft', legend=c("obs", "species","family"), pch=c(16,1,16), col=c("grey","black","black"), bty="n", cex=.9)
 legend(x=0.15, y=300, legend=c("Gymno","Angio"), pch=16, col=mypal[c(2,1)], ncol=1, bty="n", xpd=NA)
 # SMA regression for gymnos
-gymnomod <- lmodel2::lmodel2(lm(log(sat.gwat.m2, 10)~I(log(SWC,10)), fullspp[which(fullspp$Gymno.Angio=="Gymnosperm"),]))
+gymnomod <- lmodel2::lmodel2(lm(log(SWA, 10)~I(log(SWC,10)), fullspp[which(fullspp$Gymno.Angio=="Gymnosperm"),]))
 abline(a=gymnomod$regression.results$Intercept[3], b=gymnomod$regression.results$Slope[3], col=2)
 
-angiomod <- lmodel2::lmodel2(lm(log(sat.gwat.m2, 10)~I(log(SWC,10)), fullspp[which(fullspp$Gymno.Angio=="Angiosperm"),]))
+angiomod <- lmodel2::lmodel2(lm(log(SWA, 10)~I(log(SWC,10)), fullspp[which(fullspp$Gymno.Angio=="Angiosperm"),]))
 abline(a=angiomod$regression.results$Intercept[3], b=angiomod$regression.results$Slope[3], col=1)
 
 
-redwoodmod <- lmodel2::lmodel2(lm(log(sat.gwat.m2, 10)~I(log(SWC,10)), fullpvs[which(fullpvs$Species=="Sequoiadendron giganteum"),]))
+redwoodmod <- lmodel2::lmodel2(lm(log(SWA, 10)~I(log(SWC,10)), fullpvs[which(fullpvs$Species=="Sequoiadendron giganteum"),]))
 abline(a=redwoodmod$regression.results$Intercept[3], b=redwoodmod$regression.results$Slope[3], col="gray")
 
-pinemod <- lmodel2::lmodel2(lm(log(sat.gwat.m2, 10)~I(log(SWC,10)), fullpvs[which(fullpvs$Species=="Pinus albicaulis"),]))
+pinemod <- lmodel2::lmodel2(lm(log(SWA, 10)~I(log(SWC,10)), fullpvs[which(fullpvs$Species=="Pinus albicaulis"),]))
 abline(a=pinemod$regression.results$Intercept[3], b=pinemod$regression.results$Slope[3], col="gray")
 
-# oakmod <- lmodel2::lmodel2(lm(log(sat.gwat.m2, 10)~I(log(SWC,10)), fullpvs[which(fullpvs$Species=="Quercus garryana"),]))
+# oakmod <- lmodel2::lmodel2(lm(log(SWA, 10)~I(log(SWC,10)), fullpvs[which(fullpvs$Species=="Quercus garryana"),]))
 # abline(a=oakmod$regression.results$Intercept[3], b=oakmod$regression.results$Slope[3], col="gray")
 
 
@@ -664,6 +698,15 @@ points(water_loss.m2~totRWCtlp, fullspp, pch=1, col=factor(Gymno.Angio))
 points(water_loss.m2~totRWCtlp, fullfam, pch=16, col=factor(Gymno.Angio))
 legend('topleft', legend=c("obs", "species","family"), pch=c(16,1,16), col=c("grey","black","black"), bty="n", cex=.9)
 legend(x=0.2, y=1100, legend=c("Gymno","Angio"), pch=16, col=mypal[c(2,1)], ncol=2, bty="n", xpd=NA)
+
+
+par(mar=c(6,6,2,1))
+plot(SWA~LMA, fullpvs, pch=16, col="grey", log="xy", ylab="SWA \n(g H2O m-2)")
+palette(mypal)
+points(SWA~LMA, fullspp, pch=1, col=factor(Gymno.Angio))
+points(SWA~LMA, fullfam, pch=16, col=factor(Gymno.Angio))
+legend('topleft', legend=c("obs", "species","family"), pch=c(16,1,16), col=c("grey","black","black"), bty="n", cex=.9)
+legend("bottom", legend=c("Gymno","Angio"), pch=16, col=mypal[c(2,1)], ncol=2, bty="n", xpd=NA)
 ```
 
 #### Gymno-Angio divide in what drives TWL:
@@ -753,7 +796,7 @@ varmags <- data.frame(variabele=c("TLP","RWCtlp","SWC","SWA","LMA","C[T]","TWL")
 varmags$xfold.raw <- c(xfold.full(-1*fullpvs$TLP),
                        xfold.full(fullpvs$totRWCtlp),
                        xfold.full(fullpvs$SWC),
-                       xfold.full(fullpvs$sat.gwat.m2),
+                       xfold.full(fullpvs$SWA),
                        xfold.full(fullpvs$LMA),
                        xfold.full(fullpvs$CFT.g.m2),
                        xfold.full(fullpvs$water_loss.m2))
@@ -761,7 +804,7 @@ varmags$xfold.raw <- c(xfold.full(-1*fullpvs$TLP),
 varmags$xfold.90 <- c(xfold.quant(-1*fullpvs$TLP, quant.range = c(0.05,.95)),
                        xfold.quant(fullpvs$totRWCtlp, quant.range = c(0.05,.95)),
                        xfold.quant(fullpvs$SWC, quant.range = c(0.05,.95)),
-                       xfold.quant(fullpvs$sat.gwat.m2, quant.range = c(0.05,.95)),
+                       xfold.quant(fullpvs$SWA, quant.range = c(0.05,.95)),
                        xfold.quant(fullpvs$LMA, quant.range = c(0.05,.95)),
                        xfold.quant(fullpvs$CFT.g.m2, quant.range = c(0.05,.95)),
                        xfold.quant(fullpvs$water_loss.m2, quant.range = c(0.05,.95)))
@@ -769,7 +812,7 @@ varmags$xfold.90 <- c(xfold.quant(-1*fullpvs$TLP, quant.range = c(0.05,.95)),
 varmags$xfold.50 <- c(xfold.quant(-1*fullpvs$TLP),
                        xfold.quant(fullpvs$totRWCtlp),
                        xfold.quant(fullpvs$SWC),
-                       xfold.quant(fullpvs$sat.gwat.m2),
+                       xfold.quant(fullpvs$SWA),
                        xfold.quant(fullpvs$LMA),
                        xfold.quant(fullpvs$CFT.g.m2),
                        xfold.quant(fullpvs$water_loss.m2))
@@ -777,7 +820,7 @@ varmags$xfold.50 <- c(xfold.quant(-1*fullpvs$TLP),
 varmags$IQR <- c(IQR(-1*fullpvs$TLP),
                        IQR(fullpvs$totRWCtlp),
                        IQR(fullpvs$SWC),
-                       IQR(fullpvs$sat.gwat.m2),
+                       IQR(fullpvs$SWA),
                        IQR(fullpvs$LMA),
                        IQR(fullpvs$CFT.g.m2),
                        IQR(fullpvs$water_loss.m2))
@@ -785,7 +828,7 @@ varmags$IQR <- c(IQR(-1*fullpvs$TLP),
 varmags$sd <- c(sd(-1*fullpvs$TLP, na.rm=T),
                        sd(fullpvs$totRWCtlp, na.rm=T),
                        sd(fullpvs$SWC, na.rm=T),
-                       sd(fullpvs$sat.gwat.m2, na.rm=T),
+                       sd(fullpvs$SWA, na.rm=T),
                        sd(fullpvs$LMA, na.rm=T),
                        sd(fullpvs$CFT.g.m2, na.rm=T),
                        sd(fullpvs$water_loss.m2, na.rm=T))
@@ -794,7 +837,7 @@ varmags$sd <- c(sd(-1*fullpvs$TLP, na.rm=T),
 varmags$CV <- c(CV(-1*fullpvs$TLP),
                        CV(fullpvs$totRWCtlp),
                        CV(fullpvs$SWC),
-                       CV(fullpvs$sat.gwat.m2),
+                       CV(fullpvs$SWA),
                        CV(fullpvs$LMA),
                        CV(fullpvs$CFT.g.m2),
                        CV(fullpvs$water_loss.m2))
@@ -836,7 +879,7 @@ TLPmod <- lmer(TLP~1 + (1|Family/Genus/Species), fullpvs)
 RWCtlpmod <- lmer(totRWCtlp~1 + (1|Family/Genus/Species), fullpvs)
 LMAmod <- lmer(LMA~1 + (1|Family/Genus/Species), fullpvs)
 SWCmod <- lmer(SWC~1 + (1|Family/Genus/Species), fullpvs)
-gsatmod <- lmer(sat.gwat.m2~1 + (1|Family/Genus/Species), fullpvs)
+gsatmod <- lmer(SWA~1 + (1|Family/Genus/Species), fullpvs)
 CFTmod <- lmer(CFT.g.m2~1 + (1|Family/Genus/Species), fullpvs)
 WLGmod <- lmer(water_loss.g~1 + (1|Family/Genus/Species), fullpvs)
 WLMmod <- lmer(log(water_loss.m2,10)~1 + (1|Family/Genus/Species), fullpvs)
@@ -884,7 +927,7 @@ legend(xpd=T, x = 0, y=2.3, legend=c("W/Spp", "Btw Spp", "Btw Genera", "Btw Fami
 #  hist(log(-1*fullpvs$TLP)) # prob log needed for TLP
 #  hist(fullpvs$totRWCtlp) # log doesn't help
 #  hist(log(fullpvs$SWC)) # prob log needed for SWC
-#  hist(fullpvs$sat.gwat.m2) # maybe needed for sat.gwat.m2 (normalizes the non-Sequoias)
+#  hist(fullpvs$SWA) # maybe needed for SWA (normalizes the non-Sequoias)
 #  hist(log(fullpvs$CFT.g.m2)) # maybe needed for CFT (kinda 0 truncated)?
 #  hist(fullpvs$)
 #  # logged Traits
@@ -940,7 +983,7 @@ RWCtlpmod <- lmer(totRWCtlp~1 + (1|Family/Genus/Species), rarepvs)
 LMAmod <- lmer(LMA~1 + (1|Family/Genus/Species), rarepvs)
 #LMAmod <- lmer(log(LMA)~1 + (1|Family/Genus/Species), rarepvs)
 SWCmod <- lmer(SWC~1 + (1|Family/Genus/Species), rarepvs[!rownames(rarepvs) %in% c(931, 768),])
-gsatmod <- lmer(log(sat.gwat.m2, 10)~1 + (1|Family/Genus/Species), rarepvs[!rownames(rarepvs) %in% c(1014, 622),])
+gsatmod <- lmer(log(SWA, 10)~1 + (1|Family/Genus/Species), rarepvs[!rownames(rarepvs) %in% c(1014, 622),])
 CFTmod <- lmer(log(CFT.g.m2,10)~1 + (1|Family/Genus/Species), rarepvs)
 WLGmod <- lmer(water_loss.g ~1 + (1|Family/Genus/Species), rarepvs[!rownames(rarepvs) %in% c(768, 931),]) # raw outliers [!rownames(rarepvs) %in% c(768, 931),], 1014 logged
 WLMmod <- lmer(log(water_loss.m2,10)~1 + (1|Family/Genus/Species), rarepvs)
@@ -1070,9 +1113,9 @@ ggplot(fullspp, aes(x=log(water_loss.m2, 10), y=log(CFT.g.m2,10), col=Ever.Decid
 ```
 
 ``` {r other drivers CFT and TWL3}
-boxplot(CFT.g.m2~T.S.L, fullspp)
-boxplot(water_loss.m2~T.S.L, fullspp)
-ggplot(fullspp, aes(x=log(water_loss.m2, 10), y=log(CFT.g.m2,10), col=T.S.L)) + geom_point() + geom_smooth(method="lm")+ theme_classic() + ylab("CFT (g m-2 MPa-1)") + xlab("TWL (g m-2)")
+boxplot(CFT.g.m2~T.S.L.H, fullspp)
+boxplot(water_loss.m2~T.S.L.H, fullspp)
+ggplot(fullspp, aes(x=log(water_loss.m2, 10), y=log(CFT.g.m2,10), col=T.S.L.H)) + geom_point() + geom_smooth(method="lm")+ theme_classic() + ylab("CFT (g m-2 MPa-1)") + xlab("TWL (g m-2)")
 #plot(CFT.g.m2~water_loss.m2, fullspp, col=factor(Ever.Decid), log="xy", pch=16, ylab="CFT (g m-2 MPa-1)", xlab="TWL (g m-2)")
 #legend("topleft",c("fern","herb","woody"), pch=16, col=c(1,2,3))
 ```
@@ -1082,11 +1125,11 @@ ggplot(fullspp, aes(x=log(water_loss.m2, 10), y=log(CFT.g.m2,10), col=T.S.L)) + 
 ``` {r full models}
 
 
-cleanrarepvs <- rarepvs[complete.cases(rarepvs %>% select(TLP,CFT.g.m2, water_loss.m2, sat.gwat.m2, Biome, Growth.Form, Ever.Decid, T.S.L, Wild.Garden, Life.Stage, Gymno.Angio)),] # removed Growth.Form and Life.Stage, didn't clear any more 
+cleanrarepvs <- rarepvs[complete.cases(rarepvs %>% select(TLP,CFT.g.m2, water_loss.m2, SWA, Biome, Growth.Form, Ever.Decid, T.S.L.H, Wild.Garden, Life.Stage, Gymno.Angio)),] # removed Growth.Form and Life.Stage, didn't clear any more 
 
 # # check to make sure it's worth fitting everything
 # xtabs(~Biome + Growth.Form, cleanrarepvs) # Growth.Form is useless at present, need to combine Coastal with something
-# xtabs(~Ever.Decid + T.S.L, cleanrarepvs) # both good.
+# xtabs(~Ever.Decid + T.S.L.H, cleanrarepvs) # both good.
 # xtabs(~Wild.Garden + Life.Stage, cleanrarepvs) # pretty good, though only seedlings in pots.
 # xtabs(~Species + Life.Stage, cleanrarepvs) 
   # Only 3 spp with more than one life stage
@@ -1099,21 +1142,21 @@ boxplot(TLP~ Life.Stage+Species , cleanrarepvs[which(cleanrarepvs$Species %in% c
   #### DREDGE approach
 options(na.action="na.fail")
   # NOTE: I removed Growth.Form (only two non-woody) and Life.Stage (only three species with comparisons)
-LWAfullmod <- lmer(sat.gwat.m2~Biome + Ever.Decid + T.S.L + Wild.Garden  + Gymno.Angio + (1|Species), cleanrarepvs)
+LWAfullmod <- lmer(SWA~Biome + Ever.Decid + T.S.L.H + Wild.Garden  + Gymno.Angio + (1|Species), cleanrarepvs)
   # 838 obs with all of the above?!? seems actually pretty reasonable...
 LWAdredge <- dredge(LWAfullmod)
   # best model is - Grw.Frm, but 2nd best is Grw.Frm # in lmerland it's all
-TLPfullmod <- lmer(TLP~Biome + Ever.Decid + T.S.L + Wild.Garden  + Gymno.Angio + (1|Species), cleanrarepvs)
+TLPfullmod <- lmer(TLP~Biome + Ever.Decid + T.S.L.H + Wild.Garden  + Gymno.Angio + (1|Species), cleanrarepvs)
   # 838 obs with all of the above?!? seems actually pretty reasonable...
 TLPdredge <- dredge(TLPfullmod)
   # best model is Biome + Life.Stage + Wld.Grd (add in Gymno.Angio for 2nd mod)
 
-CFTfullmod <- lmer(CFT.g.m2~Biome + Ever.Decid + T.S.L + Wild.Garden  + Gymno.Angio + (1|Species), cleanrarepvs)
+CFTfullmod <- lmer(CFT.g.m2~Biome + Ever.Decid + T.S.L.H + Wild.Garden  + Gymno.Angio + (1|Species), cleanrarepvs)
   # 838 obs with all of the above?!? seems actually pretty reasonable...
 CFTdredge <- dredge(CFTfullmod)
   # best model is Everything
 
-TWLfullmod <- lmer(water_loss.m2~Biome + Ever.Decid + T.S.L + Wild.Garden  + Gymno.Angio + (1|Species), cleanrarepvs)
+TWLfullmod <- lmer(water_loss.m2~Biome + Ever.Decid + T.S.L.H + Wild.Garden  + Gymno.Angio + (1|Species), cleanrarepvs)
   # 838 obs with all of the above?!? seems actually pretty reasonable...
 TWLdredge <- dredge(TWLfullmod)
   # best model is everything
@@ -1131,13 +1174,13 @@ options(na.action="na.omit")
 
 library(variancePartition)
 
-cleanrarepvs <- rarepvs[complete.cases(rarepvs %>% select(sat.gwat.m2, TLP, CFT.g.m2, water_loss.m2,Biome, Growth.Form, Ever.Decid, T.S.L, Wild.Garden, Life.Stage, Gymno.Angio)),]
+cleanrarepvs <- rarepvs[complete.cases(rarepvs %>% select(SWA, TLP, CFT.g.m2, water_loss.m2,Biome, Growth.Form, Ever.Decid, T.S.L.H, Wild.Garden, Life.Stage, Gymno.Angio)),]
 
 # let's just try for LWA before doing all
-form.fixed <- ~ Biome+ Ever.Decid + T.S.L + Wild.Garden + Gymno.Angio 
-form.rand <- ~ (1|Biome) + (1|Ever.Decid) + (1|T.S.L)+ (1|Wild.Garden) + (1|Gymno.Angio) + (1|Species)
-test.fixed <- fitExtractVarPartModel(exprObj = t(cleanrarepvs %>% select( TLP,sat.gwat.m2, CFT.g.m2, water_loss.m2 )), formula = form.fixed, data= cleanrarepvs)
-test.rand <- fitExtractVarPartModel(exprObj = t(cleanrarepvs %>% select(TLP,sat.gwat.m2,  CFT.g.m2, water_loss.m2 )), formula = form.rand, data= cleanrarepvs)
+form.fixed <- ~ Biome+ Ever.Decid + T.S.L.H + Wild.Garden + Gymno.Angio 
+form.rand <- ~ (1|Biome) + (1|Ever.Decid) + (1|T.S.L.H)+ (1|Wild.Garden) + (1|Gymno.Angio) + (1|Species)
+test.fixed <- fitExtractVarPartModel(exprObj = t(cleanrarepvs %>% select( TLP,SWA, CFT.g.m2, water_loss.m2 )), formula = form.fixed, data= cleanrarepvs)
+test.rand <- fitExtractVarPartModel(exprObj = t(cleanrarepvs %>% select(TLP,SWA,  CFT.g.m2, water_loss.m2 )), formula = form.rand, data= cleanrarepvs)
 test.fixed <- sortCols(test.fixed)
 plotPercentBars(test.fixed)
 test.rand <- data.frame(test.rand) %>% select(c(as.character(colnames(test.fixed)), "Species"))
@@ -1177,16 +1220,16 @@ This assumes identical LAI or the viewing of a single leaf.
 mypal <- brewer.pal(n=8, "Dark2")
 mypal.light <- paste0(brewer.pal(n=8, "Dark2"),"66")
 palette(mypal.light)
-plot(TLP~sat.gwat.m2, fullpvs, type="n"
-     , xlim=c(min(pvs$tlp.gwat.m2,na.rm=T), max(pvs$sat.gwat.m2,na.rm=T))
+plot(TLP~SWA, fullpvs, type="n"
+     , xlim=c(min(pvs$LWAtlp,na.rm=T), max(pvs$SWA,na.rm=T))
      , ylim=c(min(pvs$TLP, na.rm=T), 0)
      , ylab="Water Potential (MPa)"
      , xlab="g water per m2 leaf")
 # for(i in which(pvs$Species=="Sequoiadendron giganteum")){
-#   lines(x=c(pvs$sat.gwat.m2[i],pvs$tlp.gwat.m2[i]), y=c(0,pvs$TLP[i]), col="green")
+#   lines(x=c(pvs$SWA[i],pvs$LWAtlp[i]), y=c(0,pvs$TLP[i]), col="green")
 # }
 for(i in 1:nrow(fullpvs)){
-  lines(x=c(fullpvs$sat.gwat.m2[i],fullpvs$tlp.gwat.m2[i]), y=c(0,fullpvs$TLP[i]), col= factor(fullpvs$Biome)[i]) #grey= "#11111144")
+  lines(x=c(fullpvs$SWA[i],fullpvs$LWAtlp[i]), y=c(0,fullpvs$TLP[i]), col= factor(fullpvs$Biome)[i]) #grey= "#11111144")
 }
 legend("bottom",legend=levels(factor(fullpvs$Biome)), lty=1, col=mypal.light, lwd=3,ncol=3, bty="n")
 mtext(text=paste("N=",length(which(fullpvs$water_loss.m2>0)), ";  # Species=",length(unique(fullpvs$Species[which(fullpvs$water_loss.m2>0)]))), side=3,line = 0, adj = 0)
@@ -1200,38 +1243,38 @@ quartz(width=5.5, height=4)
 mypal <- brewer.pal(n=8, "Dark2")
 mypal.light <- paste0(brewer.pal(n=8, "Dark2"),"66")
 palette(mypal.light)
-plot(TLP~sat.gwat.m2, fullspp, type="n"
-     , xlim=c(min(pvs$tlp.gwat.m2,na.rm=T), max(fullspp$sat.gwat.m2,na.rm=T))
+plot(TLP~SWA, fullspp, type="n"
+     , xlim=c(min(pvs$LWAtlp,na.rm=T), max(fullspp$SWA,na.rm=T))
      , ylim=c(min(pvs$TLP, na.rm=T), 0)
      , ylab="Water Potential (MPa)"
      , xlab="g water per m2 leaf", yaxs="i")
 # for(i in which(pvs$Species=="Sequoiadendron giganteum")){
-#   lines(x=c(pvs$sat.gwat.m2[i],pvs$tlp.gwat.m2[i]), y=c(0,pvs$TLP[i]), col="green")
+#   lines(x=c(pvs$SWA[i],pvs$LWAtlp[i]), y=c(0,pvs$TLP[i]), col="green")
 # }
 #palette(mypal)
 for(i in 1:nrow(fullspp)){
-  lines(x=c(fullspp$sat.gwat.m2[i],fullspp$tlp.gwat.m2[i]), y=c(0,-1*fullspp$TLP[i]), col= factor(fullspp$Biome)[i], lwd=1.2) #grey= "#11111144")
+  lines(x=c(fullspp$SWA[i],fullspp$LWAtlp[i]), y=c(0,-1*fullspp$TLP[i]), col= factor(fullspp$Biome)[i], lwd=1.2) #grey= "#11111144")
 }
 legend("bottomright",legend=levels(factor(fullspp$Biome)), lty=1, col=mypal, lwd=1.5,ncol=1, bty="n", cex=.7)
 mtext(text=paste( "# Species=",length(unique(fullpvs$Species[which(fullpvs$water_loss.m2>0)]))), side=3,line = 0, adj = 0)
 for(i in 1:nrow(fullspp[which(fullspp$Gymno.Angio=="Gymnosperm"),])){
-  lines(x=c(fullspp[which(fullspp$Gymno.Angio=="Gymnosperm"),]$sat.gwat.m2[i],fullspp[which(fullspp$Gymno.Angio=="Gymnosperm"),]$tlp.gwat.m2[i]), y=c(0,-1*fullspp[which(fullspp$Gymno.Angio=="Gymnosperm"),]$TLP[i]), col="black", lwd=2) #grey= "#11111144")
+  lines(x=c(fullspp[which(fullspp$Gymno.Angio=="Gymnosperm"),]$SWA[i],fullspp[which(fullspp$Gymno.Angio=="Gymnosperm"),]$LWAtlp[i]), y=c(0,-1*fullspp[which(fullspp$Gymno.Angio=="Gymnosperm"),]$TLP[i]), col="black", lwd=2) #grey= "#11111144")
 }
 legend("bottomleft", legend = "Gymnosperms", lwd=2, col="black", bty="n", cex=.9)
 ```
 And using giant sequoia as a case study for how much this can vary within a species (since we have 440 values from Sequoiadendron giganteum - Thank you Cam Williams!)
 
 ``` {r within species sequoia variation, echo=F}
-plot(TLP~sat.gwat.m2, fullpvs, type="n"
-     , xlim=c(0, max(fullpvs$sat.gwat.m2,na.rm=T)) # min(fullpvs$tlp.gwat.m2,na.rm=T)-100
+plot(TLP~SWA, fullpvs, type="n"
+     , xlim=c(0, max(fullpvs$SWA,na.rm=T)) # min(fullpvs$LWAtlp,na.rm=T)-100
      , ylim=c(min(fullpvs$TLP, na.rm=T), 0)
      , ylab="Water Potential (MPa)"
      , xlab="g water per m2 leaf")
 for(i in which(fullpvs$Species=="Sequoiadendron giganteum")){
-  lines(x=c(fullpvs$sat.gwat.m2[i],fullpvs$tlp.gwat.m2[i]), y=c(0,fullpvs$TLP[i]), col="green")
+  lines(x=c(fullpvs$SWA[i],fullpvs$LWAtlp[i]), y=c(0,fullpvs$TLP[i]), col="green")
 }
 for(i in 1:nrow(fullpvs)){
-  lines(x=c(fullpvs$sat.gwat.m2[i],fullpvs$tlp.gwat.m2[i]), y=c(0,fullpvs$TLP[i]), col="#11111144")
+  lines(x=c(fullpvs$SWA[i],fullpvs$LWAtlp[i]), y=c(0,fullpvs$TLP[i]), col="#11111144")
 }
 mtext(text=paste("N=",length(which(fullpvs$water_loss.m2>0)), ";  # Species=",length(unique(fullpvs$Species[which(fullpvs$water_loss.m2>0)]))), side=3,line = 0, adj = 0)
 
@@ -1249,30 +1292,30 @@ mypal <- brewer.pal(n=8, "Dark2")
 mypal.light <- paste0(brewer.pal(n=8, "Dark2"),"66")
 palette(mypal.light)
 
-plot(TLP~sat.gwat.m2, fullpvs, type="n"
-     , xlim=c(min(pvs$tlp.gwat.m2,na.rm=T), max(fullspp$sat.gwat.m2,na.rm=T))
+plot(TLP~SWA, fullpvs, type="n"
+     , xlim=c(min(pvs$LWAtlp,na.rm=T), max(fullspp$SWA,na.rm=T))
      , ylim=c(min(pvs$TLP, na.rm=T), 0)
      , ylab="Water Potential (MPa)"
-     , xlab="g water per m2 leaf", yaxs="i")
+     , xlab="LWA (g water per m2 leaf)", yaxs="i")
 rep.spp <- names(xtabs(~Species, fullpvs)[which(xtabs(~Species, fullpvs)>10)][order(xtabs(~Species, fullpvs)[which(xtabs(~Species, fullpvs)>10)], decreasing=T)])
 rep.spp.names <- c("Seq. giganteum","Pinus albicaulis","Quercus garryana","Pinus longaeva","Davilla kunthii", "Terminalia amazonia", "Zea mays")
 # for(i in 1:nrow(fullpvs)){
-#   lines(x=c(fullpvs$sat.gwat.m2[i],fullpvs$tlp.gwat.m2[i]), y=c(0,fullpvs$TLP[i]), col="#11111144")
+#   lines(x=c(fullpvs$SWA[i],fullpvs$LWAtlp[i]), y=c(0,fullpvs$TLP[i]), col="#11111144")
 # }
 for(i in 1:nrow(fullspp)){
-  lines(x=c(fullspp$sat.gwat.m2[i],fullspp$tlp.gwat.m2[i]), y=c(0,-1*fullspp$TLP[i]), col= "#11111144", lwd=1) #grey= "#11111144")
+  lines(x=c(fullspp$SWA[i],fullspp$LWAtlp[i]), y=c(0,-1*fullspp$TLP[i]), col= "#11111144", lwd=1) #grey= "#11111144")
 }
 palette(mypal)
 for(spp in 1:length(rep.spp)){
   tmp <- fullpvs %>% filter(Species == rep.spp[spp])
   for(i in 1:nrow(tmp)){
-    lines(x=c(tmp$sat.gwat.m2[i],tmp$tlp.gwat.m2[i]), y=c(0,tmp$TLP[i]), col=spp)
+    lines(x=c(tmp$SWA[i],tmp$LWAtlp[i]), y=c(0,tmp$TLP[i]), col=spp)
     }
 }
 
 legend(x=-190, y=1.5, legend = rep.spp.names, lwd=2, col=mypal[1:7], xpd=NA, ncol=4, cex=.8, bty="n")
 
-mtext(text=paste("N=",length(which(fullpvs$water_loss.m2>0)), ";  # Species=",length(unique(fullpvs$Species[which(fullpvs$water_loss.m2>0)]))), side=3,line = 0, adj = 0)
+#mtext(text=paste("N=",length(which(fullpvs$water_loss.m2>0)), ";  # Species=",length(unique(fullpvs$Species[which(fullpvs$water_loss.m2>0)]))), side=3,line = 0, adj = 0)
 
 
 ```
@@ -1280,20 +1323,20 @@ mtext(text=paste("N=",length(which(fullpvs$water_loss.m2>0)), ";  # Species=",le
 #### Gymnosperms Only
 ``` {r gymnos only}
 gymnos <- fullpvs[which(fullpvs$Gymno.Angio=="Gymnosperm"),]
-plot(TLP~sat.gwat.m2, gymnos, type="n"
-     , xlim=c(min(gymnos$tlp.gwat.m2,na.rm=T), max(gymnos$sat.gwat.m2,na.rm=T))
+plot(TLP~SWA, gymnos, type="n"
+     , xlim=c(min(gymnos$LWAtlp,na.rm=T), max(gymnos$SWA,na.rm=T))
      , ylim=c(min(gymnos$TLP, na.rm=T), 0)
      , ylab="Water Potential (MPa)"
      , xlab="g water per m2 leaf")
 rep.spp <- names(xtabs(~Species, gymnos)[which(xtabs(~Species, gymnos)>10)])
 for(i in 1:nrow(gymnos)){
-  lines(x=c(gymnos$sat.gwat.m2[i],gymnos$tlp.gwat.m2[i]), y=c(0,gymnos$TLP[i]), col="#11111144")
+  lines(x=c(gymnos$SWA[i],gymnos$LWAtlp[i]), y=c(0,gymnos$TLP[i]), col="#11111144")
 }
 
 for(spp in 1:length(rep.spp)){
   tmp <- gymnos %>% filter(Species == rep.spp[spp])
   for(i in 1:nrow(tmp)){
-    lines(x=c(tmp$sat.gwat.m2[i],tmp$tlp.gwat.m2[i]), y=c(0,tmp$TLP[i]), col=spp, lwd=1)
+    lines(x=c(tmp$SWA[i],tmp$LWAtlp[i]), y=c(0,tmp$TLP[i]), col=spp, lwd=1)
     }
 }
 
@@ -1303,21 +1346,21 @@ mtext(text=paste("N=",length(which(gymnos$water_loss.m2>0)), ";  # Species=",len
 
 #### Angiosperms Only (note change in x axis)
 ``` {r angios only}
-angios <- fullpvs[which(fullpvs$Gymno.Angio=="Angiosperm" & fullpvs$sat.gwat.m2<800),]
-plot(TLP~sat.gwat.m2, angios, type="n"
-     , xlim=c(min(angios$tlp.gwat.m2,na.rm=T), max(angios$sat.gwat.m2,na.rm=T))
+angios <- fullpvs[which(fullpvs$Gymno.Angio=="Angiosperm" & fullpvs$SWA<800),]
+plot(TLP~SWA, angios, type="n"
+     , xlim=c(min(angios$LWAtlp,na.rm=T), max(angios$SWA,na.rm=T))
      , ylim=c(min(angios$TLP, na.rm=T), 0)
      , ylab="Water Potential (MPa)"
      , xlab="g water per m2 leaf")
 rep.spp <- names(xtabs(~Species, angios)[which(xtabs(~Species, angios)>10)])
 for(i in 1:nrow(angios)){
-  lines(x=c(angios$sat.gwat.m2[i],angios$tlp.gwat.m2[i]), y=c(0,angios$TLP[i]), col="#11111144")
+  lines(x=c(angios$SWA[i],angios$LWAtlp[i]), y=c(0,angios$TLP[i]), col="#11111144")
 }
 
 for(spp in 1:length(rep.spp)){
   tmp <- angios %>% filter(Species == rep.spp[spp])
   for(i in 1:nrow(tmp)){
-    lines(x=c(tmp$sat.gwat.m2[i],tmp$tlp.gwat.m2[i]), y=c(0,tmp$TLP[i]), col=spp, lwd=1.4)
+    lines(x=c(tmp$SWA[i],tmp$LWAtlp[i]), y=c(0,tmp$TLP[i]), col=spp, lwd=1.4)
     }
 }
 
@@ -1366,11 +1409,11 @@ qgar$Rehydration <- factor(qgar$Rehydration)
 qgar$LMA <- with(qgar, Dry_mass/Fresh_area)
 
 # calculate the g of h20 per m2 of leaf area at full saturation
-qgar$sat.gwat.m2 <- qgar$SWC * qgar$LMA
+qgar$SWA <- qgar$SWC * qgar$LMA
 # calculate the g of h20 per m2 leaf area at tlp
-qgar$tlp.gwat.m2 <-qgar$sat.gwat.m2 * qgar$RWC_tlp
+qgar$LWAtlp <-qgar$SWA * qgar$RWC_tlp
 # calculate the water lost per m2 leaf area between saturation and tlp
-qgar$water_loss.m2 <- with(qgar, sat.gwat.m2 - tlp.gwat.m2)
+qgar$water_loss.m2 <- with(qgar, SWA - LWAtlp)
 
 
 mypal2 <- brewer.pal(n=8, "Set1")
@@ -1471,28 +1514,28 @@ abline(lm(log(water_loss.m2,10)~I(log(TLP,10)), fullspp))
 mtext(paste("R2=",round(summary(lm(log(water_loss.m2,10)~I(log(TLP,10)), fullspp))$r.squared,2)), side = 3, line=-1.5, adj = .2)
 
 
-plot(sat.gwat.m2~CFT.g.m2, fullspp, col=factor(Biome), pch=16, log="xy", xlab=expression(paste("Capacitance ", g*MPa*m^2)))
-abline(lm(log(sat.gwat.m2,10)~I(log(CFT.g.m2,10)), fullspp))
-mtext(paste("R2=",round(summary(lm(log(sat.gwat.m2,10)~I(log(CFT.g.m2,10)), fullspp))$r.squared,2)), side = 3, line=-1.5, adj = .2)
+plot(SWA~CFT.g.m2, fullspp, col=factor(Biome), pch=16, log="xy", xlab=expression(paste("Capacitance ", g*MPa*m^2)))
+abline(lm(log(SWA,10)~I(log(CFT.g.m2,10)), fullspp))
+mtext(paste("R2=",round(summary(lm(log(SWA,10)~I(log(CFT.g.m2,10)), fullspp))$r.squared,2)), side = 3, line=-1.5, adj = .2)
 mtext(expression(paste("Sat gWater ",m^-2,"")), side=2, line=2.5)
-plot(sat.gwat.m2~totRWCtlp, fullspp, col=factor(Biome), pch=16, log="xy", xlab="%RWC @ TLP", yaxt="n")
-abline(lm(log(sat.gwat.m2,10)~I(log(totRWCtlp,10)), fullspp), lty=2)
-mtext(paste("R2=",round(summary(lm(log(sat.gwat.m2,10)~I(log(totRWCtlp,10)), fullspp))$r.squared,2)), side = 3, line=-1.5, adj = .2)
-plot(sat.gwat.m2~SWC, fullspp, col=factor(Biome), pch=16, log="xy", xlab="SWC gh20 gdrymass", yaxt="n")
-abline(lm(log(sat.gwat.m2,10)~I(log(SWC,10)), fullspp))
-mtext(paste("R2=",round(summary(lm(log(sat.gwat.m2,10)~I(log(SWC,10)), fullspp))$r.squared,2)), side = 3, line=-1.5, adj = .2)
-plot(sat.gwat.m2~LMA, fullspp, col=factor(Biome), pch=16, log="xy", xlab="LMA g per m2", yaxt="n")
-abline(lm(log(sat.gwat.m2,10)~I(log(LMA,10)), fullspp))
-mtext(paste("R2=",round(summary(lm(log(sat.gwat.m2,10)~I(log(LMA,10)), fullspp))$r.squared,2)), side = 3, line=-1.5, adj = .2)
-plot(sat.gwat.m2~TLP, fullspp, col=factor(Biome), pch=16, log="xy", xlab="TLP (MPa)", yaxt="n")
-abline(lm(log(sat.gwat.m2,10)~I(log(TLP,10)), fullspp), lty=2)
-mtext(paste("R2=",round(summary(lm(log(sat.gwat.m2,10)~I(log(TLP,10)), fullspp))$r.squared,2)), side = 3, line=-1.5, adj = .2)
+plot(SWA~totRWCtlp, fullspp, col=factor(Biome), pch=16, log="xy", xlab="%RWC @ TLP", yaxt="n")
+abline(lm(log(SWA,10)~I(log(totRWCtlp,10)), fullspp), lty=2)
+mtext(paste("R2=",round(summary(lm(log(SWA,10)~I(log(totRWCtlp,10)), fullspp))$r.squared,2)), side = 3, line=-1.5, adj = .2)
+plot(SWA~SWC, fullspp, col=factor(Biome), pch=16, log="xy", xlab="SWC gh20 gdrymass", yaxt="n")
+abline(lm(log(SWA,10)~I(log(SWC,10)), fullspp))
+mtext(paste("R2=",round(summary(lm(log(SWA,10)~I(log(SWC,10)), fullspp))$r.squared,2)), side = 3, line=-1.5, adj = .2)
+plot(SWA~LMA, fullspp, col=factor(Biome), pch=16, log="xy", xlab="LMA g per m2", yaxt="n")
+abline(lm(log(SWA,10)~I(log(LMA,10)), fullspp))
+mtext(paste("R2=",round(summary(lm(log(SWA,10)~I(log(LMA,10)), fullspp))$r.squared,2)), side = 3, line=-1.5, adj = .2)
+plot(SWA~TLP, fullspp, col=factor(Biome), pch=16, log="xy", xlab="TLP (MPa)", yaxt="n")
+abline(lm(log(SWA,10)~I(log(TLP,10)), fullspp), lty=2)
+mtext(paste("R2=",round(summary(lm(log(SWA,10)~I(log(TLP,10)), fullspp))$r.squared,2)), side = 3, line=-1.5, adj = .2)
 
 ```
 
 For some reason Picea mariana is way high for both of these, 
 - I can't tell why. It's not extreme. 
-It's got a pretty high (2nd highest) saturated water content per m2 but also a high tlp.gwat.m2
+It's got a pretty high (2nd highest) saturated water content per m2 but also a high LWAtlp
 pretty high LMA, particularly for its SWC?
 
 
@@ -1517,14 +1560,14 @@ plot(SWC~water_loss.m2, fullspp, col=factor(Biome), pch=16, log="xy", xlab=expre
 abline(lm(log(SWC,10)~I(log(water_loss.m2,10)), fullspp))
 mtext(paste("R2=",round(summary(lm(log(SWC,10)~I(log(water_loss.m2,10)), fullspp))$r.squared,2)), side = 3, line=-1.5, adj = .2)
 
-plot(sat.gwat.m2~CFT.g.m2, fullspp, col=factor(Biome), pch=16, log="xy", xlab=expression(paste("Capacitance (",MPa^-1,m^-2,")")), cex.lab=1.1)
-abline(lm(log(sat.gwat.m2,10)~I(log(CFT.g.m2,10)), fullspp))
-mtext(paste("R2=",round(summary(lm(log(sat.gwat.m2,10)~I(log(CFT.g.m2,10)), fullspp))$r.squared,2)), side = 3, line=-1.5, adj = .2)
+plot(SWA~CFT.g.m2, fullspp, col=factor(Biome), pch=16, log="xy", xlab=expression(paste("Capacitance (",MPa^-1,m^-2,")")), cex.lab=1.1)
+abline(lm(log(SWA,10)~I(log(CFT.g.m2,10)), fullspp))
+mtext(paste("R2=",round(summary(lm(log(SWA,10)~I(log(CFT.g.m2,10)), fullspp))$r.squared,2)), side = 3, line=-1.5, adj = .2)
 mtext(expression(paste("Sat Water ",Content[area])), side=2, line=2.5)
 
-plot(sat.gwat.m2~water_loss.m2, fullspp, col=factor(Biome), pch=16, log="xy", xlab=expression(paste("Total Water Loss (",m^-2,")")), cex.lab=1.1, yaxt="n")
-abline(lm(log(sat.gwat.m2,10)~I(log(water_loss.m2,10)), fullspp))
-mtext(paste("R2=",round(summary(lm(log(sat.gwat.m2,10)~I(log(water_loss.m2,10)), fullspp))$r.squared,2)), side = 3, line=-1.5, adj = .2)
+plot(SWA~water_loss.m2, fullspp, col=factor(Biome), pch=16, log="xy", xlab=expression(paste("Total Water Loss (",m^-2,")")), cex.lab=1.1, yaxt="n")
+abline(lm(log(SWA,10)~I(log(water_loss.m2,10)), fullspp))
+mtext(paste("R2=",round(summary(lm(log(SWA,10)~I(log(water_loss.m2,10)), fullspp))$r.squared,2)), side = 3, line=-1.5, adj = .2)
 
 
 ```
@@ -1563,16 +1606,16 @@ TAKEHOMES:
 
 ``` {r code snippets for mb mid processing, include=F}
 # for(i in 1:nrow(mb12clean)){
-#      lines(x=c(mb12clean$sat.gwat.m2[i],mb12clean$tlp.gwat.m2[i]), y=c(0,mb12clean$TLP[i]), col="red")
+#      lines(x=c(mb12clean$SWA[i],mb12clean$LWAtlp[i]), y=c(0,mb12clean$TLP[i]), col="red")
 #  }
 # 
 # treats <- factor(mb14wc$Treatment)
 # for(i in 1:nrow(mb14wc)){
-#      lines(x=c(mb14wc$sat.gwat.m2[i],mb14wc$tlp.gwat.m2[i]), y=c(0,mb14wc$TLP[i]), col="blue")
+#      lines(x=c(mb14wc$SWA[i],mb14wc$LWAtlp[i]), y=c(0,mb14wc$TLP[i]), col="blue")
 # }
 # 
 # for(i in 1:nrow(mb14wc)){
-#      lines(x=c(mb14wc$sat.gwat.m2[i],mb14wc$tlp.gwat.m2[i]), y=c(0,mb14wc$TLP[i]), col="purple")
+#      lines(x=c(mb14wc$SWA[i],mb14wc$LWAtlp[i]), y=c(0,mb14wc$TLP[i]), col="purple")
 # }
 
 ```
