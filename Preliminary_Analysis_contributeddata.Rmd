@@ -490,40 +490,56 @@ fullspp <- fullspp[which(!is.na(fullspp$Species)),]
 # cleaning and adding in family info
 # bin some of the low n biomes
 fullspp$Biome[which(fullspp$Biome %in% c("Coastal","SemiDesert","Tundra"))] <- "Other"
+
 #***NOTE: I switch the sign on TLP for ease of plotting!
 
-# require(taxize)
-# family.itis <- data.frame("db"=rep(NA, nrow(fullspp)),"query"=rep(NA, nrow(fullspp)), "family"=rep(NA, nrow(fullspp)))
-# for( i in 1:nrow(fullspp)){
-#   family.itis[i,] <- unlist(tax_name(fullspp$Species[i],get="family",db="itis"))
-# } # bonks on Larix decidua [106]?!?
-# #family.itis$query[106] <- "Larix decidua"
-# #family.itis$family="Pinaceae"
-# # second time bonks at 162 
+require(taxize)
+family.itis <- data.frame("db"=rep(NA, nrow(fullspp)),"query"=rep(NA, nrow(fullspp)), "family"=rep(NA, nrow(fullspp)))
+for( i in 1:nrow(fullspp)){
+  family.itis[i,] <- unlist(tax_name(fullspp$Species[i],get="family",db="itis"))
+} 
+# bonks on Larix decidua [183]
+family.itis$query[183] <- "Larix decidua"
+family.itis$family[183]="Pinaceae"
+
+# second time bonks at 162
 # family.itis$query[162] <- "Polystichum munitum"
+# family.itis$family[162] <- "Dryopteridaceae"
+
+#  for( i in 184:nrow(fullspp)){
+#    family.itis[i,] <- unlist(tax_name(fullspp$Species[i],get="family",db="itis"))
+#  }
+# 
+# family.itis1 <- family.itis
+# family.itis$query[183] <- "Polystichum munitum"
+# 
+# family.itis$query[183] <- "Polystichum munitum"
 # family.itis$family[162] <- "Dryopteridaceae"
 # for( i in 163:nrow(fullspp)){
 #   family.itis[i,] <- unlist(tax_name(fullspp$Species[i],get="family",db="itis"))
 # }
-# 
+
 # fullspp$Species[162]
-# missing <- family.itis$query[which(is.na(family.itis$family))]
-# family.ncbi <- data.frame("db"=rep(NA, length(missing)),"query"=rep(NA, length(missing)), "family"=rep(NA, length(missing)))
-# for(i in 1:length(missing)){
-#   family.ncbi[i,] <- unlist(tax_name(missing[i],get="family",db="ncbi"))
-# }
+# family.itis1$query <- fullspp$Species
+#write.csv(family.itis, "DerivedData/Family_lookuptable_ITIS_20240812.csv")
+missing <- family.itis1$query[which(is.na(family.itis1$family))]
+family.ncbi <- data.frame("db"=rep(NA, length(missing)),"query"=rep(NA, length(missing)), "family"=rep(NA, length(missing)))
+for(i in 1:length(missing)){
+  family.ncbi[i,] <- unlist(tax_name(missing[i],get="family",db="ncbi"))
+}
 # for(i in 19:length(missing)){
 #   family.ncbi[i,] <- unlist(tax_name(missing[i],get="family",db="ncbi"))
 # }
-# for(i in 40:length(missing)){
+# for(i in 27:length(missing)){
 #   family.ncbi[i,] <- unlist(tax_name(missing[i],get="family",db="ncbi"))
-# }
-# 
-# family.itis$family[which(is.na(family.itis$family))] <- family.ncbi$family[match(family.itis$query[which(is.na(family.itis$family))], family.ncbi$query)]
+#}
+
+family.itis$family[which(is.na(family.itis$family))] <- family.ncbi$family[match(family.itis$query[which(is.na(family.itis$family))], family.ncbi$query)]
 
 #write.csv(family.itis, "DerivedData/Family_lookuptable_ITIS-NCBI_20230802.csv")
+write.csv(family.itis, "DerivedData/Family_lookuptable_ITIS-NCBI_20240812.csv")
 
-family.itis <- read.csv("DerivedData/Family_lookuptable_ITIS-NCBI_20230802.csv")
+family.itis <- read.csv("DerivedData/Family_lookuptable_ITIS-NCBI_20240812.csv")
 
 # add in Families to spp average and full dataset
 fullspp$Family <- family.itis$family[match(fullspp$Species,family.itis$query)]
@@ -554,8 +570,6 @@ fullpvs$Gymno.Angio[which(fullpvs$Family %in% gymnos)] <- "Gymnosperm"
 fullspp$CFT.g.m2[which(fullspp$Species=="Picea mariana")] <- NA
 fullspp$water_loss.m2[which(fullspp$Species=="Picea mariana")] <- NA
 
-fullpvs$CFT.g.m2[which(fullpvs$Species=="Picea mariana")] <- NA
-fullpvs$water_loss.m2[which(fullpvs$Species=="Picea mariana")] <- NA
 
 
 fullfam <- fullspp %>% group_by(Family, Gymno.Angio) %>% summarise(TLP = -1*mean(TLP, na.rm=T),
@@ -576,8 +590,8 @@ fullfam <- fullspp %>% group_by(Family, Gymno.Angio) %>% summarise(TLP = -1*mean
 
 ```
 
-Still missing 160 families somehow, but will go back and fix those
-- part of this is that none of Megans Chinese spp have families yet after updating
+Still missing 50 families somehow, but will go back and fix those
+
 
 
 ## Saturated Water Content: How much water is there per dry mass ('SWC') vs m2 leaf area ('SWA')
