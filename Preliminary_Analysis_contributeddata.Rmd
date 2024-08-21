@@ -592,11 +592,12 @@ fullfam <- fullspp %>% group_by(Family, Gymno.Angio) %>% summarise(TLP = -1*mean
 
 Still missing 50 families somehow, but will go back and fix those
 
+#Point 1) LMA and SWC aren't highly correlated, and LMA is more variable than SWC. Therefore, LMA drives most of the variation in LWA.
 
 
 ## Saturated Water Content: How much water is there per dry mass ('SWC') vs m2 leaf area ('SWA')
 ``` {r Saturated water per mass vs area, echo=F, warnings=F }
-par(mar=c(8,8,2,1))
+par(mfrow=c(2,1),mar=c(8,8,2,1))
 boxplot(SWC~Biome, fullspp, las=2
         , xlab="", ylab=expression(paste("Sat g water per g dry mass")))
 mtext(text=paste("# Species=",length(which(fullspp$SWC>0))), side=3,line = 0, adj = 0)
@@ -611,35 +612,52 @@ mtext(text=paste("# Species=",length(which(fullspp$SWA>0))), side=3,line = 0, ad
 -But conifers have the highest saturated water content per unit leaf area, and crops and Med move towards the mean. Temperate plants have the least water per unit leaf area @ saturation.\
 
 
-``` {r raw}
 
-ggplot(fullspp, aes(x=SWC,y=SWA, col=Biome)) +  xlab("Sat g water per g dry mass\nMass Basis") + ylab("Sat g water per m2\nArea Basis") + geom_point(data=fullpvs) + geom_point(col="#00000066") + ggtitle("All Obs, raw") + facet_wrap(~Gymno.Angio)
+``` {r log-log SWC and LMA plot}
+mypal <- brewer.pal(n=8, "Dark2")
+palette(mypal)
+par(mar=c(6,6,2,1))
+plot(LMA~SWC, fullpvs, pch=16, col="grey", log="xy", ylab="LMA", xlab="Sat g Water per g dry mass\nMass Basis")
+palette(mypal)
+points(LMA~SWC, fullspp, pch=1, col=factor(Gymno.Angio))
+points(LMA~SWC, fullfam, pch=16, col=factor(Gymno.Angio))
+legend('topleft', legend=c("obs", "species","family"), pch=c(16,1,16), col=c("grey","black","black"), bty="n", cex=.9)
+legend(x=0.2, y=500, legend=c("Gymno","Angio"), pch=16, col=mypal[c(2,1)], ncol=2, bty="n", xpd=NA)
 ```
+
 \
-black points = spp means, colored points = all obs
+Indeed, there's a vague decrease in LMA with increasing SWC among Angiosperm species, but really no strong relationship between the two. So the SWC~SWA relationship is going to be hard to predict from LMA or SWC.\
 \
-- There's definitely a much steeper slope in SWC on an Area vs Mass basis across gymnosperms than angiosperms. scaling slope = LMA so makes sense that gymnos have higher LMA (if there's no change in LMA/correlation with SWC)
+\
+
 
 ### log-log relationships
 
 ``` {r continued SWC on mass vs area basis}
-ggplot(fullspp, aes(x=log(SWC, base=10),y=log(SWA,base=10), col=Biome)) +  xlab("log10 Sat g water per g dry mass\nMass Basis") + ylab("log10 Sat g water per m2\nArea Basis") + geom_smooth(method="lm", se=F) + #geom_point(data=fullpvs) + 
-  geom_point() + ggtitle("Spp means, log-log")
 
+
+# ggplot(fullspp, aes(x=SWC,y=SWA, col=Biome)) +  xlab("Sat g water per g dry mass\nMass Basis") + ylab("Sat g water per m2\nArea Basis") + geom_point(data=fullpvs) + geom_point(col="#00000066") + ggtitle("All Obs, raw") + facet_wrap(~Gymno.Angio)
+
+# ggplot(fullspp, aes(x=log(SWC, base=10),y=log(SWA,base=10), col=Biome)) +  xlab("log10 Sat g water per g dry mass\nMass Basis") + ylab("log10 Sat g water per m2\nArea Basis") + geom_smooth(method="lm", se=F) + #geom_point(data=fullpvs) + 
+#   geom_point() + ggtitle("Spp means, log-log")
+
+# NOTE: the normal geom_smooth really shows different scaling lines than typeII regression.
 #ggplot(pvs, aes(x=log(LMA),y=log(SWA), col=Biome)) + geom_point() + xlab("log(LMA)") + ylab("log(g water per m2 leaf)")
 
 #ggplot(pvs, aes(x=LMA,y=SWC, col=Biome)) + geom_point() + xlab("LMA") + ylab("g water per m2 leaf")
+
+# \
+# 
+# - There is generally a positive scaling relationship between mass- versus area-based saturated water content, but there are strong intercept differences between biomes and possibly some scaling slope differences\
+# - There's definitely a much steeper slope in SWC on an Area vs Mass basis across gymnosperms than angiosperms. scaling slope = LMA so makes sense that gymnos have higher LMA (if there's no change in LMA/correlation with SWC)
+
 ```
-
-\
-- There is generally a positive scaling relationship between mass- versus area-based saturated water content, but there are strong intercept differences between biomes and possibly some scaling slope differences\
-
 
 ``` {r log-log plot}
 mypal <- brewer.pal(n=8, "Dark2")
 palette(mypal)
 par(mar=c(6,6,2,1))
-plot(SWA~SWC, fullpvs, pch=16, col="grey", log="xy", ylab="Sat g water per m2\nArea Basis", xlab="Sat g Water per g dry mass\nMass Basis")
+plot(SWA~SWC, fullpvs, pch=16, col="grey", log="xy", ylab="SWA\n(gH2O m-2 Area)", xlab="SWC\n(gH2O g-1 dry mass)")
 palette(mypal)
 points(SWA~SWC, fullspp, pch=1, col=factor(Gymno.Angio))
 points(SWA~SWC, fullfam, pch=16, col=factor(Gymno.Angio))
@@ -666,23 +684,11 @@ abline(a=pinemod$regression.results$Intercept[3], b=pinemod$regression.results$S
 ```
 - among gymnsoperm species, there's a steeper scaling relationship between SWA and SWC 
 - however, within a gymnosperm species (see the redwood cluster of gray points) the scaling slope looks similar to the angiosperm slope but with a massive offset in intercept\
+\
 
-``` {r log-log SWC and LMA plot}
-mypal <- brewer.pal(n=8, "Dark2")
-palette(mypal)
-par(mar=c(6,6,2,1))
-plot(LMA~SWC, fullpvs, pch=16, col="grey", log="xy", ylab="LMA", xlab="Sat g Water per g dry mass\nMass Basis")
-palette(mypal)
-points(LMA~SWC, fullspp, pch=1, col=factor(Gymno.Angio))
-points(LMA~SWC, fullfam, pch=16, col=factor(Gymno.Angio))
-legend('topleft', legend=c("obs", "species","family"), pch=c(16,1,16), col=c("grey","black","black"), bty="n", cex=.9)
-legend(x=0.2, y=500, legend=c("Gymno","Angio"), pch=16, col=mypal[c(2,1)], ncol=2, bty="n", xpd=NA)
-```
 
-\
-Indeed, there's a vague decrease in LMA with increasing SWC among Angiosperm species, but really no strong relationship between the two. So the above relationships couldn't have been predicted just from LMA or SWC.\
-\
-\
+
+
 
 ## Role of SWC and LMA in determining Total Water Loss
 The total amount of water *per unit leaf area* (total water loss per m2, or TWL) that can be lost from a leaf between saturation and TLP is a product of the RWC at TLP (RWCtlp), the Saturated Water Content (SWC) and Leaf Mass per Area (LMA).
