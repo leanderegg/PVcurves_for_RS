@@ -102,7 +102,13 @@ pvs$Rehydrated[which(pvs$Rehydrated=="Yes")] <- "Y"
 
 ```
 
-\*Data quality notes: To Double Check Danielle Ulrich - apoplastic fractions \>1, German Vargas - Species with crazy totRWCtlp and other values,Chris M. Smith-Martin - CFT calculation off.
+\*Data quality notes:
+
+\- To Double Check Danielle Ulrich - apoplastic fractions \>1,
+
+\- German Vargas - Species with crazy totRWCtlp and other values,
+
+\- Chris M. Smith-Martin - CFT calculation off.
 
 ```{r calculate some desired quantities}
 # calculate the g of h20 per m2 of leaf area at full saturation
@@ -159,7 +165,7 @@ apply(pvs %>% select(TLP,totRWCtlp,LMA,SWC,CFT.mol.m2,water_loss.m2,CFT.g.m2,CFT
 
 \-**water_loss.m2** = total g water lost per m2 leaf area going from full sutration to TLP (calculated above)
 
-### Bring in Data from Bartlett Meta-analyses
+### Data from Bartlett Meta-analyses
 
 We'll bring in Megan's published meta-analyses from Bartlett et al. 2012 and Bartlett et al. 2014. However, these only have RWCtlp and sometimes LMA, and we need SWC (or LDMC) to transform these curves into absolute gH2O per mass or area. So I pulled all the LMA and LDMC data from TRY to infill with species average data where I can.
 
@@ -327,6 +333,8 @@ mb14cc$Dataset <- "mb14"
 mb12clean <- mb12clean %>% select(colnames(mb14wc))
 mb14cc <- mb14cc %>% select(colnames(mb14wc))
 ```
+
+*Notes:*
 
 So net result of TRY + mb12 and mb14 datasets is 72 additional species and 120 total values (w and dry for mb14 datasets) I'll take it.
 
@@ -526,7 +534,7 @@ fullfam <- fullspp %>% group_by(Family, Gymno.Angio) %>% summarise(TLP = -1*mean
 
 ```
 
-Still missing 68 families somehow, but will go back and fix those - part of this is that none of Megans Chinese spp have families yet after updating
+-   Still missing 68 families somehow, but will go back and fix those - part of this is that none of Megans Chinese spp have families yet after updating...
 
 ## END: Load, merge and clean data
 
@@ -538,9 +546,9 @@ Still missing 68 families somehow, but will go back and fix those - part of this
 
 data frame explainer pvs.master: original fullpvs: whole dataset, contributed and pulled from two meta-analyses, lost some metadata from the pvs.master
 
-##### Yos Analysis
+##### Yos analysis
 
-Analyzed and ordered based on the factors to consider
+Analyzed and ordered based on the factors to consider after looking at different relationships with and within variables.
 
 ## TLP
 
@@ -555,11 +563,13 @@ boxplot(SWC~T.S.L, fullpvs, xlab = "T.S.L", ylab = "SWC", main = "Saturated Wate
 
 ```
 
-\*TLP mean for TSL is around -2 except for bamboo, with the greatest variance & range for trees. Trees possibly have adaptive qualities that allow for TLP to be much lower. SWC shows similar means, possibly relative to TLP for the purpose of clearly identifying the water content relationship to TLP.
+*TLP median for TSL is around -2 except for bamboo, with the greatest variance & range for trees. Trees possibly have adaptive qualities that allow for TLP to be much lower. SWC shows similar medians, possibly relative to TLP for the purpose of clearly identifying the water content relationship to TLP.*
 
 ## Saturated Water Content: How much water is there per dry mass ('SWC') vs m2 leaf area ('SWA')? SWA is the area saturated, closer to identifying wilt through satellite
 
-Biomes are considered next since TSL did not show an average mean throughout for a closer relationship (other graphs area at the end to look over).
+ANSWER
+
+Biomes are considered next, for a closer relationship, since TSL did not show an average median throughout (other graphs area at the end to look over different variables and their relationship to TSL).
 
 ```{r Saturated water per mass vs area, echo=F, warnings=F }
 par(mar=c(8,8,2,1))
@@ -583,13 +593,15 @@ mtext(text=paste("# Species=",length(unique(fullspp$Species[which(fullspp$TLP>0)
 
 ```
 
-\*SWC does not have a consistent mean across biome but SWA does. TLP area calculation has an average mean too, and [RWC\@TLP](mailto:RWC@TLP){.email} is not looking to bad as well except for tropical moist.
+*SWC does not have a consistent median across biomes but SWA does. Between the two, SWA is preffered but at the end of the day grams of water could vary from the grams of dry mass with and without rehydration (more on that in HERE). TLP area calculation has an average median too, and RWC\@TLP is not looking too bad as well except for tropical moist.*
 
 *Takehome*: LMA really really matters.\
--Crops are the wettest and Med/Conifers driest saturated water content (SWC) per unit dry mass\
--But conifers have the highest saturated water content per unit leaf area, and crops and Med move towards the mean.  -Temperate plants have the least water per unit leaf area \@ saturation.\
+- Crops are the wettest and Med/Conifers driest saturated water content (SWC) per unit dry mass\
+- But conifers have the highest saturated water content per unit leaf area, and crops and Med move towards the mean. Temperate plants have the least water per unit leaf area \@ saturation.
 
-Next, accounting for the differences between other factors. Angiosperms and Gymnosperms could have a different impact on how the water content is looked at.
+## Angiosperms and Gymnosperms: How much do biomes differ when looking at angio and gymno side by side for different variables? This could have a different impact on how well water content is portrayed from above.
+
+Next, accounting for the differences between factors that can be analyzed separately.
 
 ```{r raw: angio vs gymno}
 
@@ -598,16 +610,34 @@ ggplot(fullspp, aes(x=SWC,y=sat.gwat.m2, col=Biome)) +  xlab("SWC - g water per 
 ggplot(fullspp, aes(x=water_loss.m2,y=CFT.g.m2, col=Biome)) +  xlab("TWL") + ylab("CFT") + geom_point(data=fullpvs) + geom_point(col="#00000066") + ggtitle("All Obs, raw\n Gymnosperm vs Angiosperm per Biome\n Relationship between Total Water Loss and Capacitance") + facet_wrap(~Gymno.Angio)
 ```
 
-\*SWA is much more predictable from SWC without gymnosperms. In comparison to capacitance and total water loss, gymnosperms are much more predictable but angiosperms are not.
+*SWA is much more predictable from SWC without gymnosperms. In comparison to capacitance and total water loss, gymnosperms are much more predictable but angiosperms are not.*
 
 \
 black points = species means, colored points = all observations\
 - There's definitely a much steeper slope in SWC on an Area vs Mass basis across gymnosperms than angiosperms.\
 - Scaling slope = LMA so makes sense that gymnos have higher LMA (if there's no change in LMA/correlation with SWC)
 
-### log-log relationships
+### Angiosperms only: How is TWL accomplished when looking at RWC\@TLP?
 
-Starting with SWC and SWA then looking at the other variables, biomes are considered for the relationships possible.
+ANSWERS
+
+```{r effects of totRWC and SWC on TWL}
+ggplot(fullspp[which(fullspp$Gymno.Angio=="Angiosperm"),], aes(x=log(SWC,10), y=log(water_loss.m2, 10), col=totRWCtlp)) + geom_point() + geom_smooth(data=fullspp[which(fullspp$Gymno.Angio=="Angiosperm" & fullspp$totRWCtlp<80),], method="lm", se=F, col="black") + geom_smooth(data=fullspp[which(fullspp$Gymno.Angio=="Angiosperm" & fullspp$totRWCtlp>80),], method="lm", se=F) + ylab("log10 - TWL - g water m2") + xlab("log10 - SWC - g water per g dry mass") + ggtitle("Angio only\n Species % Total RWC@TLP\n Relationship between log TWL & log SWC")
+```
+
+*(black line in plot is spp with totRWCtlp \< 80% and blue is spp with totRWCtlp\>80%)*
+
+```{r}
+ggplot(fullspp[which(fullspp$Gymno.Angio=="Angiosperm"),], aes(x=log(sat.gwat.m2,10), y=log(water_loss.m2, 10), col=totRWCtlp)) + geom_point() + geom_smooth(data=fullspp[which(fullspp$Gymno.Angio=="Angiosperm" & fullspp$totRWCtlp<80),], method="lm", se=F, col="black") + geom_smooth(data=fullspp[which(fullspp$Gymno.Angio=="Angiosperm" & fullspp$totRWCtlp>80),], method="lm", se=F) + ylab("log10 - TWL - g water m2") + xlab("log10 - SWA - g water per m2") + ggtitle("Angio only\n Species % Total RWC@TLP\n Relationship between log TWL & log SWA")
+```
+
+*(black line in plot is spp with totRWCtlp \< 80% and blue is spp with totRWCtlp\>80%)*
+
+### Further into variable relationships (log-log relationships): Is TWL do to high capacitance (CFT, g water per m2 leaf area per MPa water potential change)? Or to low RWC \@ TLP (i.e. the ability to desiccate your leaves)?
+
+TWL probably has a stronger methodological implication (for remote sensing) than physiological implication. But it might be worth exploring how species with high TWL accomplish this large water loss.
+
+Starting with SWC and SWA then looking at the other variables, biomes are considered for the relationships possible. First, are capacitance (CFT) and RWCtlp related? (i.e. could it be both?)
 
 ```{r continued SWC on mass vs area basis}
 ggplot(fullspp, aes(x=log(SWC, base=10),y=log(sat.gwat.m2,base=10), col=Biome)) +  xlab("log10 - SWC - g water per g dry mass\nMass Basis") + ylab("log10 - SWA - g water per m2\nArea Basis") + geom_smooth(method="lm", se=F) + 
@@ -631,59 +661,12 @@ ggplot(fullspp, aes(x=log(tlp.gwat.m2, base=10),y=log(sat.gwat.m2,base=10), col=
 
 All biomes show a positive relationship which is relatively good but can account for unpredictable TLP. A perfect relationship can be seen with TLP area and SWA, which is not the same for TLP and SWC for comparison (other graphs shwoing a negative relationship are in the end).
 
-```{r}
-
+```{r log-log scaling of CFT and RWCtlp}
+ggplot(pvs[which(pvs$water_loss.m2>0),], aes(y=CFT.g.m2_mycalc, x=totRWCtlp, col=log(water_loss.m2,base=10))) + geom_point() + xlab("Total RWC@TLP") + ylab("CFT (mycalc)") + ggtitle("log Total Water Loss\n Relationship between CFT & Total RWC@TLP")
+#ggplot(fullpvs[which(fullpvs$water_loss.m2>0),], aes(y=water_loss.m2, x=totRWCtlp, col=CFT.g.m2)) geom_point()
 ```
 
-\*Total water loss can predict capacitance for angiosperm and gymnosperm.
-
-```{r}
-
-```
-
-*?*: Capacitance and total water loss have a positive log log relationship for all biomes but there are some intercepts./
-
-```{r}
-
-```
-
-*?*:
-
-```{r}
-
-```
-
-*?*: Does not look great but considering TLP is in g/m2 maybe something else can better relate to TLP./
-
-```{r}
-
-```
-
-*?*: Capacitance does not have a positive relationship with TLP g/m2 for all biomes
-
-```{r}
-
-```
-
-*?*: Capacitance has mostly a negative relationship with TLP but not for all biomes and so CFT relates to total water loss the best
-
-```{r}
-
-```
-
-*?*: Total water loss and TLP g/m2 have mostly a positive relationship per biome but not exactly
-
-```{r}
-
-```
-
-*?*: Total water loss and total RWC \@ TLP have mostly a negative relationship with the exception of other
-
-```{r}
-
-```
-
-*?*: Capacitance relates similarly to Total RWC \@ TLP as does total water loss but slope is less negative for some biomes
+## Role of SWC and LMA in determining Total Water Loss
 
 ```{r log-log plot}
 mypal <- brewer.pal(n=8, "Dark2")
@@ -713,8 +696,6 @@ abline(a=pinemod$regression.results$Intercept[3], b=pinemod$regression.results$S
 -   among gymnsoperm species, there's a steeper scaling relationship between SWA and SWC
 -   however, within a gymnosperm species (see the redwood cluster of gray points) the scaling slope looks similar to the angiosperm slope but with a massive offset in intercept\
 
-## Role of SWC and LMA in determining Total Water Loss
-
 ```{r log-log SWC and LMA plot}
 mypal <- brewer.pal(n=8, "Dark2")
 palette(mypal)
@@ -729,8 +710,8 @@ legend(x=0.2, y=500, legend=c("Gymno","Angio"), pch=16, col=mypal[c(2,1)], ncol=
 
 \
 Indeed, there's a vague decrease in LMA with increasing SWC among Angiosperm species, but really no strong relationship between the two. So the above relationships couldn't have been predicted just from LMA or SWC.\
-\
-\
+
+### Gymno-Angio divide in what drives TWL:
 
 The total amount of water *per unit leaf area* (total water loss per m2, or TWL) that can be lost from a leaf between saturation and TLP is a product of the RWC at TLP (RWCtlp), the Saturated Water Content (SWC) and Leaf Mass per Area (LMA).
 
@@ -761,8 +742,6 @@ legend('topleft', legend=c("obs", "species","family"), pch=c(16,1,16), col=c("gr
 legend(x=0.2, y=1100, legend=c("Gymno","Angio"), pch=16, col=mypal[c(2,1)], ncol=2, bty="n", xpd=NA)
 ```
 
-#### Gymno-Angio divide in what drives TWL:
-
 -All the variation in TWL in *Gymnosperms* is due to LMA, and confers have massive LMA so they have high TWL. Also strongly related to totRWCtlp within sequoia and somewhat across species\
 
 -The variation in *Angiosperms* isn't strongly driven by LMA, but jointly determined by SWC and totRWCtlp.\
@@ -782,57 +761,9 @@ legend(x=0.2, y=1100, legend=c("Gymno","Angio"), pch=16, col=mypal[c(2,1)], ncol
 Interestingly, there's essentially no relationship\
 So in Angiosperms the effects of the two are largely independent:
 
-## Variables for Total [RWC\@TLP](mailto:RWC@TLP){.email}
-
-```{r effects of totRWC and SWC on TWL}
-ggplot(fullspp[which(fullspp$Gymno.Angio=="Angiosperm"),], aes(x=log(SWC,10), y=log(water_loss.m2, 10), col=totRWCtlp)) + geom_point() + geom_smooth(data=fullspp[which(fullspp$Gymno.Angio=="Angiosperm" & fullspp$totRWCtlp<80),], method="lm", se=F, col="black") + geom_smooth(data=fullspp[which(fullspp$Gymno.Angio=="Angiosperm" & fullspp$totRWCtlp>80),], method="lm", se=F) + ylab("log10 - TWL - g water m2") + xlab("log10 - SWC - g water per g dry mass") + ggtitle("Angio only\n Species % Total RWC@TLP\n Relationship between log TWL & log SWC")
-```
-
 (black line in last plot is spp with totRWCtlp \< 80% and blue is spp with totRWCtlp\>80%)\
 
-## How you accomplish high TWL
-
-TWL probably has a stronger methodological implication (for remote sensing) than physiological implication. But it might be worth exploring how species with high TWL accomplish this large water loss.\
-Is it do to high capacitance (CFT, g water per m2 leaf area per MPa water potential change)?\
-Or to low RWC \@ TLP (i.e. the ability to desiccate your leaves)?
-
-First, are capacitance (CFT) and RWCtlp related? (i.e. could it be both?)
-
-```{r}
-ggplot(fullspp[which(fullspp$Gymno.Angio=="Angiosperm"),], aes(x=log(sat.gwat.m2,10), y=log(water_loss.m2, 10), col=totRWCtlp)) + geom_point() + geom_smooth(data=fullspp[which(fullspp$Gymno.Angio=="Angiosperm" & fullspp$totRWCtlp<80),], method="lm", se=F, col="black") + geom_smooth(data=fullspp[which(fullspp$Gymno.Angio=="Angiosperm" & fullspp$totRWCtlp>80),], method="lm", se=F) + ylab("log10 - TWL - g water m2") + xlab("log10 - SWA - g water per m2") + ggtitle("Angio only\n Species % Total RWC@TLP\n Relationship between log TWL & log SWA")
-```
-
-(black line in last plot is spp with totRWCtlp \< 80% and blue is spp with totRWCtlp\>80%)\
-
-*?*: SWA is better than SWC at showing a relationship with total water loss when looking at how total RWC \@ TLP differs
-
-```{r}
-
-```
-
-(black line in last plot is spp with totRWCtlp \< 80% and blue is spp with totRWCtlp\>80%)\
-
-*?*: Total water loss and CFT do not have the same distinction for total RWC \@ TLP
-
-```{r}
-
-```
-
-(black line in last plot is spp with totRWCtlp \< 80% and blue is spp with totRWCtlp\>80%)\
-
-*?*: Capacitance and Saturated g of water per m2 do not have a strong distinction for total RWC \@ TLP but can be differntiated from
-
-```{r}
-
-```
-
-(black line in last plot is spp with totRWCtlp \< 80% and blue is spp with totRWCtlp\>80%)\
-
-*?*: TLP g/m2 and LMA have almost no distinction for total RWC \@ TLP
-
-```{r}
-
-```
+SWA is better than SWC at showing a relationship with total water loss when looking at how total RWC \@ TLP differs
 
 ```{r How you accomplish high TWL}
 # Megan's point about achieving high water loss either by having high capacitance or low totRWCtlp
@@ -851,22 +782,11 @@ They are somewhat negatively related, so high TWL is a bit of both. But they're 
 
 Looking at the log-log scaling:
 
-```{r log-log scaling of CFT and RWCtlp}
-ggplot(pvs[which(pvs$water_loss.m2>0),], aes(y=CFT.g.m2_mycalc, x=totRWCtlp, col=log(water_loss.m2,base=10))) + geom_point() + xlab("Total RWC@TLP") + ylab("CFT (mycalc)") + ggtitle("log Total Water Loss\n Relationship between CFT & Total RWC@TLP")
-#ggplot(fullpvs[which(fullpvs$water_loss.m2>0),], aes(y=water_loss.m2, x=totRWCtlp, col=CFT.g.m2)) geom_point()
-```
-
 \
 \### Takehome:\
 It looks to me like CFT (capacitance) is actually more important than totRWCtlp for driving high TWL on a leaf area basis.
 
-```{r}
-
-```
-
-## Decomposing Variance:
-
-#### How much and why do all of these variables vary globally?
+## Decomposing Variance: How much and why do all of these variables vary globally?
 
 *1) The absolute x-fold variation*\
 (calculated here as (max - min)/min...is this the right way to calculate this?):
@@ -1061,98 +981,13 @@ legend(xpd=T, x = 0, y=2.3, legend=c("W/Spp", "Btw Spp", "Btw Genera", "Btw Fami
 
 ```
 
-```{r var decomp for rarified dataset}
-# need to rarify Sequoiadendron giganteum because too damn many of them.
-# maybe also Pinus albicaulis?
-
-rarepvs <- fullpvs[which(fullpvs$Species!="Sequoiadendron giganteum" & fullpvs$Species != "Pinus albicaulis"),]
-SEGI <- fullpvs[sample(which(fullpvs$Species=="Sequoiadendron giganteum"),size =34),]
-PIAB <- fullpvs[which(fullpvs$Species=="Pinus albicaulis" & fullpvs$SWC>0),] 
-# only 34 PIABs have actual SWC and LMA values anyway
-
-rarepvs <- rbind(rarepvs, SEGI, PIAB)
-
-
-# # or fitting with a Bayesian model
-# require(rstanarm)
-# require(ggplot2)
-# require(bayesplot)
-# theme_set(bayesplot::theme_default())
-# Raw Traits
-TLPmod <- lmer(TLP~1 + (1|Family/Genus/Species), rarepvs)
-RWCtlpmod <- lmer(totRWCtlp~1 + (1|Family/Genus/Species), rarepvs)
-LMAmod <- lmer(LMA~1 + (1|Family/Genus/Species), rarepvs)
-#LMAmod <- lmer(log(LMA)~1 + (1|Family/Genus/Species), rarepvs)
-SWCmod <- lmer(SWC~1 + (1|Family/Genus/Species), rarepvs[!rownames(rarepvs) %in% c(931, 768),])
-gsatmod <- lmer(log(sat.gwat.m2, 10)~1 + (1|Family/Genus/Species), rarepvs[!rownames(rarepvs) %in% c(1014, 622),])
-CFTmod <- lmer(log(CFT.g.m2,10)~1 + (1|Family/Genus/Species), rarepvs)
-WLGmod <- lmer(water_loss.g ~1 + (1|Family/Genus/Species), rarepvs[!rownames(rarepvs) %in% c(768, 931),]) # raw outliers [!rownames(rarepvs) %in% c(768, 931),], 1014 logged
-WLMmod <- lmer(log(water_loss.m2,10)~1 + (1|Family/Genus/Species), rarepvs)
-# WLMmod <- stan_lmer(water_loss.m2~1 + (1|Family/Genus/Species), rarepvs) # yup, the Family sigma is low
-# SWCmod <- stan_lmer(log(SWC,10)~1 + (1|Family/Genus/Species), rarepvs)
-# launch_shinystan(SWCmod)
-  #well, it actually DOES look like the Family sigma gets estimated at ~0 in both ML and Bayes land for log(SWC)
-  # I don't know why this varies so much from RAW to Logged for SWC...
-
-# Log transforms?
-# qqp(resid(TLPmod)) # maybe better, but trades high for low resids
-# qqp(resid(RWCtlpmod)) #almost no effect
-# qqp(resid(LMAmod)) # does kinda improves. Logging increases within/genus var
-# qqp(resid(SWCmod)) # ok if you remove outliers. doesn't need it.
-# qqp(resid(gsatmod)) # looks substantially better logged, and hist looks better
-# qqp(resid(CFTmod)) # looks quite a bit better, as does hist, shrinks w/in Fam and a bit fam and w/in spp, increases w/in genus
-# qqp(resid(WLGmod)) # slight improvement with logging, hist looks a bit better. TOTALLY changes interpretation from mostly Fam to mostly not.... YIKES
-# qqp(resid(WLMmod)) # logging expands w/in genus, but doesn't change Fam
-
-TLPvar<- data.frame(VarCorr(TLPmod))
-RWCtlpvar<- data.frame(VarCorr(RWCtlpmod))
-LMAvar <- data.frame(VarCorr(LMAmod))
-SWCvar<- data.frame(VarCorr(SWCmod))
-gsatvar<- data.frame(VarCorr(gsatmod))
-CFTvar<- data.frame(VarCorr(CFTmod))
-WLGvar<- data.frame(VarCorr(WLGmod))
-WLMvar <- data.frame(VarCorr(WLMmod))
-
-
-traitvars_rar <- data.frame(TLPvar[,4], RWCtlpvar[,4], LMAvar[,4],SWCvar[,4], gsatvar[,4], CFTvar[,4], WLGvar[,4], WLMvar[,4])
-colnames(traitvars_rar) <- c("TLP","RWCtlp","LMA", "SWC","SWA", "CFT", "WaterLoss_g", "TWL")
-rownames(traitvars_rar) <- c("BtwSpecies", "BtwGenera", "BtwFamilies", "WtinSpecies")
-
-traitvars_rar <- traitvars_rar[c("BtwFamilies","BtwGenera","BtwSpecies","WtinSpecies"),]
-
-traitvars_rar_scaled <- traitvars_rar
-for(i in 1:ncol(traitvars_rar)){
-  traitvars_rar_scaled[,i] <- traitvars_rar[,i]/sum(traitvars_rar[,i])
-}
-
-
-#quartz(width=5, height=4)
-# quartz(width=5, height=3.5)
-# par(mgp=c(3,.7,0), cex.lab=1.3, cex.axis=1.1, mfrow=c(1,1), mar=c(6,2,3,6), oma=c(0,3,0,0))
-# 
-# mypal <- brewer.pal(n=9, "Set1")
-# colchoices <- c(1,2,4,3,6)
-# cols <-rev(c(mypal[colchoices[c(1,2,3)]],"#CCCCCC"))#brewer.pal(11, "RdBu")[c(11,9,1, 6)]
-# # "#CCCCCC" "#984EA3" "#377EB8" "#E41A1C"
-# #cols <- brewer.pal(11, "RdBu")[c(1,11,9,7)]
-# # cols <- "#B2182B" "#053061" "#F7F7F7" "#4393C3"
-# #"#67001F" "#053061" "#4393C3" "#D1E5F0"
-# barplot(as.matrix(traitvars_rar_scaled[,-7]),beside=F,legend.text = F,xpd = T, names.arg = c("TLP","RWCtlp","LMA", "SWC","SWA","C[T]", "TWL"), las=2,args.legend = list(x=4, y=1.3, ncol=2), col = paste0(cols,"99"), ylab="Proportion of total Variance", xlab="")
-# mtext("Proportion of Total Variance", side=2, line=2.8)
-# 
-# #legend(xpd=T, x = 0, y=2.3, legend=c("W/Spp", "Btw Spp", "Btw Genera", "Btw Families"), fill=paste0(cols,"CC")[c(4,3,2,1)], ncol=2, bty="n",  cex=1.2)
-# legend(xpd=NA, x = 8.5, y=0.7, legend=rev(c("btw Fams","btw Gen","btw Spp","w/in Spp")), fill=rev(paste0(cols,"99")), ncol=1, bty="n",  cex=1)
-# 
-
-```
-
 \
 -TLP: Turgor Loss Point (MPa)\
 - SWC/TWL g-1 = Sat Water Content/Total Water Loss per unit leaf mass\
 - SWC/TWL m-2 = per unit leaf area.\
 \*note: these may be sensitive to the large Sequoiadendron dataset, need to double check that.\
-\
-\### Look at some of the same attributes per biome and leaf habit -removed Picea mariana because massive high outlier
+
+#### Removing Picea Mariana: Massive Outlier  Look at some of the same attributes per biome and leaf habit
 
 ```{r prelim analysis}
 par(mar=c(8,5,2,1))
@@ -1196,6 +1031,8 @@ Ultimately, they've got very different modes of variation.\
 \
 Assuming that CFT (slope of the Psi\~Water/area relationship) and TWL (potential maximum signal) are the two most important metrics, let's explore other predictors of variation for them.
 
+###Other Predictors of variation
+
 ```{r other drivers CFT and TWL}
 
 
@@ -1225,10 +1062,6 @@ legend("topleft",c("fern","herb","woody"), pch=16, col=c(1,2,3))
 
 -Herbaceous and woody plants have fairly similar TWL (woody gets lower as TWL increases), but herbs generally have higher CFT.
 
-```{r}
-
-```
-
 ```{r other drivers CFT and TWL2}
 boxplot(CFT.g.m2~Ever.Decid, fullspp, ylab = "CFT", main = "CFT of Ever.Decid")
 
@@ -1253,11 +1086,6 @@ boxplot(water_loss.m2~T.S.L, fullspp, xlab = "T.S.L.", ylab = "TWL - g water per
 ggplot(fullspp, aes(x=log(water_loss.m2, 10), y=log(CFT.g.m2,10), col=T.S.L)) + geom_point() + geom_smooth(method="lm")+ theme_classic() + ylab("CFT - g/m2/MPa1") + xlab("TWL - g/m2") + ggtitle("T.S.L. CFT & TWL")
 #plot(CFT.g.m2~water_loss.m2, fullspp, col=factor(Ever.Decid), log="xy", pch=16, ylab="CFT (g m-2 MPa-1)", xlab="TWL (g m-2)")
 #legend("topleft",c("fern","herb","woody"), pch=16, col=c(1,2,3))
-```
-
-```{r}
-
-
 ```
 
 ```{r full models}
@@ -1314,7 +1142,7 @@ library(variancePartition)
 
 cleanrarepvs <- rarepvs[complete.cases(rarepvs %>% select(sat.gwat.m2, TLP, CFT.g.m2, water_loss.m2,Biome, Growth.Form, Ever.Decid, T.S.L, Wild.Garden, Life.Stage, Gymno.Angio)),]
 
-# let's just try for LWA before doing all
+#let's just try for LWA before doing all
 form.fixed <- ~ Biome+ Ever.Decid + T.S.L + Wild.Garden + Gymno.Angio 
 form.rand <- ~ (1|Biome) + (1|Ever.Decid) + (1|T.S.L)+ (1|Wild.Garden) + (1|Gymno.Angio) + (1|Species)
 test.fixed <- fitExtractVarPartModel(exprObj = t(cleanrarepvs %>% select( TLP,sat.gwat.m2, CFT.g.m2, water_loss.m2 )), formula = form.fixed, data= cleanrarepvs)
@@ -1330,7 +1158,7 @@ plotPercentBars(test.rand)
 par(mgp=c(3,.7,0), cex.lab=1.3, cex.axis=1.1, mfrow=c(1,1), mar=c(6,2,3,6), oma=c(0,3,0,0))
  
 mypal <- brewer.pal(n=9, "Set1")
- # "#E41A1C" "#377EB8" "#4DAF4A" "#984EA3" "#FF7F00" "#FFFF33" "#A65628" "#F781BF" "#999999"
+  "#E41A1C" "#377EB8" "#4DAF4A" "#984EA3" "#FF7F00" "#FFFF33" "#A65628" "#F781BF" "#999999"
 
  barplot(height=t(as.matrix(data.frame(test.rand))), beside = F, las=2, col=c(mypal[1:5], "white",mypal[6]), ylab="% Variance Explained",
          names.arg = c("TLP","SWA","C[T]","TWL"),)
@@ -1345,8 +1173,7 @@ Sooo, I get somewhat different results with rarified vs unrarified fullpvs datas
 However, the answer is substantially different for some traits with a (1\|Species) random effect vs no species random effect. I think I prob need the species, but maybe I can rerun on the fullspp and get the same thing?\
 - But for both TLP and SWA pretty much all the within species var gets thrown into Life.Stage
 
-\
-\# Putting it together: PV curves we can 'see' from RS This is the actual relationship between water potential and absolute g water content (per m2 leaf area). This assumes identical LAI or the viewing of a single leaf.
+## PV curves we can 'see' from RS: This is the actual relationship between water potential and absolute g water content (per m2 leaf area). This assumes identical LAI or the viewing of a single leaf.
 
 ```{r plotting raw Psi per g curves, echo=F}
 mypal <- brewer.pal(n=8, "Dark2")
@@ -1450,7 +1277,7 @@ mtext(text=paste("N=",length(which(fullpvs$water_loss.m2>0)), ";  # Species=",le
 
 ```
 
-#### Gymnosperms Only
+### Gymnosperms Only
 
 ```{r gymnos only}
 gymnos <- fullpvs[which(fullpvs$Gymno.Angio=="Gymnosperm"),]
@@ -1475,7 +1302,7 @@ mtext(text=paste("N=",length(which(gymnos$water_loss.m2>0)), ";  # Species=",len
 
 ```
 
-#### Angiosperms Only (note change in x axis)
+### Angiosperms Only (note change in x axis)
 
 ```{r angios only}
 angios <- fullpvs[which(fullpvs$Gymno.Angio=="Angiosperm" & fullpvs$sat.gwat.m2<800),]
@@ -1521,15 +1348,9 @@ for(i in 1:nrow(fullspp)){
 }
 ```
 
-# Figures for AGU
-
-\
-\
-\# \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_ \# And the Methodological elephant in the room: Rehydration
+## Figures for AGU: The Methodological elephant in the room... Rehydration. Reconstructing PV curves (i.e. in RWC space)
 
 Using data from Hahm et al. 2018 Ecosphere, where they measured PV curves on Quercus garyana using leaves that were rehydrated versus non rehydrated.
-
-#### Reconstructing PV curves (i.e. in RWC space)
 
 ```{r rehydration data and plot, echo=F}
 # Data from Hahm 2018 Ecosphere
@@ -1597,9 +1418,7 @@ bestTWL <- dredge(modTWL)
 
 # \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
-# Stream of Conciousness : Other plots less thought through...
-
-### SWC,LMA and TLP: test of some previously used correlations
+# Stream of Consciousness : Other plots less thought through... SWC, LMA and TLP test of some previously used correlations
 
 ```{r more plots, include=T}
 par(mfrow=c(2,2), mar=c(3.5,0,1,0), oma=c(0,4,0,1), mgp=c(2.5,1,0))
@@ -1624,9 +1443,9 @@ mtext("LMA", side=2, line=2.5)
 
 ```
 
-Can we predict a leaf's characteristics from other characteristics of it? (when those characteristics aren't mathmatically related) - Not really. - The previously hypothesized correlation between TLP and SWC/LDMC isn't great
+Can we predict a leaf's characteristics from other characteristics of it? (when those characteristics aren't mathematically related) - Not really. - The previously hypothesized correlation between TLP and SWC/LDMC isn't great
 
-#### Exapnded biplots: Moving towards a fishing expedition
+#### Expanded biplots: Moving towards a fishing expedition
 
 ```{r more plotz}
 par(mfrow=c(2,5), mar=c(3.5,0,1,0), oma=c(0,4,0,1), mgp=c(2.5,1,0))
@@ -1692,14 +1511,9 @@ plot(sat.gwat.m2~water_loss.m2, fullspp, col=factor(Biome), pch=16, log="xy", xl
 abline(lm(log(sat.gwat.m2,10)~I(log(water_loss.m2,10)), fullspp))
 mtext(paste("R2=",round(summary(lm(log(sat.gwat.m2,10)~I(log(water_loss.m2,10)), fullspp))$r.squared,2)), side = 3, line=-1.5, adj = .2)
 
-
 ```
 
 Total water content (mass basis) not strongly linked to Capacitance or Tot Water Loss (area basis) But Total Water Content (area basis) is more related to TWL than
-
-```{r}
-
-```
 
 ### How much water can they lose?
 
@@ -1738,7 +1552,7 @@ TAKEHOMES:
 
 ```
 
-### *Pulling out effect of SWC to just look at slopes*
+#### Pulling out effect of SWC to just look at slopes
 
 ```{r drydown in RWC vs Absolute WC space, echo=F}
 
@@ -1826,9 +1640,7 @@ mtext("Linear Fit?")
 
 # \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
-###Other Graphs
-
-Storing all other graphs looked over in order presented above
+## Other Graphs: Stored all other graphs, already looked at, in order presented above
 
 TLP - means of T.S.L.
 
@@ -1908,8 +1720,6 @@ legend("topleft",c("fern","herb","woody"), pch=16, col=c(1,2,3))
 Ever.Decid
 
 ```{r}
-
-
 
 ```
 
