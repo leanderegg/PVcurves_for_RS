@@ -493,51 +493,51 @@ fullspp$Biome[which(fullspp$Biome %in% c("Coastal","SemiDesert","Tundra"))] <- "
 
 #***NOTE: I switch the sign on TLP for ease of plotting!
 
-require(taxize)
-family.itis <- data.frame("db"=rep(NA, nrow(fullspp)),"query"=rep(NA, nrow(fullspp)), "family"=rep(NA, nrow(fullspp)))
-for( i in 1:nrow(fullspp)){
-  family.itis[i,] <- unlist(tax_name(fullspp$Species[i],get="family",db="itis"))
-} 
-# bonks on Larix decidua [183]
-family.itis$query[183] <- "Larix decidua"
-family.itis$family[183]="Pinaceae"
-
-# second time bonks at 162
-# family.itis$query[162] <- "Polystichum munitum"
-# family.itis$family[162] <- "Dryopteridaceae"
-
-#  for( i in 184:nrow(fullspp)){
-#    family.itis[i,] <- unlist(tax_name(fullspp$Species[i],get="family",db="itis"))
-#  }
-# 
-# family.itis1 <- family.itis
-# family.itis$query[183] <- "Polystichum munitum"
-# 
-# family.itis$query[183] <- "Polystichum munitum"
-# family.itis$family[162] <- "Dryopteridaceae"
-# for( i in 163:nrow(fullspp)){
+# require(taxize)
+# family.itis <- data.frame("db"=rep(NA, nrow(fullspp)),"query"=rep(NA, nrow(fullspp)), "family"=rep(NA, nrow(fullspp)))
+# for( i in 1:nrow(fullspp)){
 #   family.itis[i,] <- unlist(tax_name(fullspp$Species[i],get="family",db="itis"))
-# }
-
-# fullspp$Species[162]
-# family.itis1$query <- fullspp$Species
-#write.csv(family.itis, "DerivedData/Family_lookuptable_ITIS_20240812.csv")
-missing <- family.itis1$query[which(is.na(family.itis1$family))]
-family.ncbi <- data.frame("db"=rep(NA, length(missing)),"query"=rep(NA, length(missing)), "family"=rep(NA, length(missing)))
-for(i in 1:length(missing)){
-  family.ncbi[i,] <- unlist(tax_name(missing[i],get="family",db="ncbi"))
-}
-# for(i in 19:length(missing)){
+# } 
+# # bonks on Larix decidua [183]
+# family.itis$query[183] <- "Larix decidua"
+# family.itis$family[183]="Pinaceae"
+# 
+# # second time bonks at 162
+# # family.itis$query[162] <- "Polystichum munitum"
+# # family.itis$family[162] <- "Dryopteridaceae"
+# 
+# #  for( i in 184:nrow(fullspp)){
+# #    family.itis[i,] <- unlist(tax_name(fullspp$Species[i],get="family",db="itis"))
+# #  }
+# # 
+# # family.itis1 <- family.itis
+# # family.itis$query[183] <- "Polystichum munitum"
+# # 
+# # family.itis$query[183] <- "Polystichum munitum"
+# # family.itis$family[162] <- "Dryopteridaceae"
+# # for( i in 163:nrow(fullspp)){
+# #   family.itis[i,] <- unlist(tax_name(fullspp$Species[i],get="family",db="itis"))
+# # }
+# 
+# # fullspp$Species[162]
+# # family.itis1$query <- fullspp$Species
+# #write.csv(family.itis, "DerivedData/Family_lookuptable_ITIS_20240812.csv")
+# missing <- family.itis1$query[which(is.na(family.itis1$family))]
+# family.ncbi <- data.frame("db"=rep(NA, length(missing)),"query"=rep(NA, length(missing)), "family"=rep(NA, length(missing)))
+# for(i in 1:length(missing)){
 #   family.ncbi[i,] <- unlist(tax_name(missing[i],get="family",db="ncbi"))
 # }
-# for(i in 27:length(missing)){
-#   family.ncbi[i,] <- unlist(tax_name(missing[i],get="family",db="ncbi"))
-#}
-
-family.itis$family[which(is.na(family.itis$family))] <- family.ncbi$family[match(family.itis$query[which(is.na(family.itis$family))], family.ncbi$query)]
-
-#write.csv(family.itis, "DerivedData/Family_lookuptable_ITIS-NCBI_20230802.csv")
-write.csv(family.itis, "DerivedData/Family_lookuptable_ITIS-NCBI_20240812.csv")
+# # for(i in 19:length(missing)){
+# #   family.ncbi[i,] <- unlist(tax_name(missing[i],get="family",db="ncbi"))
+# # }
+# # for(i in 27:length(missing)){
+# #   family.ncbi[i,] <- unlist(tax_name(missing[i],get="family",db="ncbi"))
+# #}
+# 
+# family.itis$family[which(is.na(family.itis$family))] <- family.ncbi$family[match(family.itis$query[which(is.na(family.itis$family))], family.ncbi$query)]
+# 
+# #write.csv(family.itis, "DerivedData/Family_lookuptable_ITIS-NCBI_20230802.csv")
+# write.csv(family.itis, "DerivedData/Family_lookuptable_ITIS-NCBI_20240812.csv")
 
 family.itis <- read.csv("DerivedData/Family_lookuptable_ITIS-NCBI_20240812.csv")
 
@@ -592,6 +592,17 @@ fullfam <- fullspp %>% group_by(Family, Gymno.Angio) %>% summarise(TLP = -1*mean
 
 Still missing 50 families somehow, but will go back and fix those
 
+``` {r missing metadata}
+
+apply(fullspp, MARGIN=2, FUN = function(x){length(which(is.na(x)))})
+```
+
+# need:
+38 Ever.Decid\
+53 T.S.L.H\
+50 family\
+\
+\
 #Point 1) LMA and SWC aren't highly correlated, and LMA is more variable than SWC. Therefore, LMA drives most of the variation in LWA.
 
 

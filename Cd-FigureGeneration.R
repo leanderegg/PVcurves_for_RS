@@ -1,4 +1,4 @@
-######## Plotting Figures ####################
+######## Plotting Figures for Presentations/Manuscript####################
 # requires running Preliminary_Analysis_contributed... to get all the data in
 
 

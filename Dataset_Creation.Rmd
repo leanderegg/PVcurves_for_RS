@@ -1,0 +1,626 @@
+---
+title: "PV-for-RS_Analysis"
+author: "LDL Anderegg"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(RColorBrewer)
+library(dplyr)
+library(reshape2)
+mypal <- brewer.pal(n=8, "Set1")
+palette(mypal)
+require(ggplot2)
+require(maps)
+library(tidyverse)
+library(car)
+library(lme4)
+library(lmerTest)
+library(MuMIn)
+```
+
+## The Contributed Dataset:
+
+``` {r import contributed data, echo=F}
+
+  # download protocol: Download from Google Drive, name xlsx version. Remove rows 1,2, and 4 and save as versioned .csv.
+
+# first round of data submissions
+pvs1 <- read.csv("data/ContributedData/PV_for_RS_metaanalysis_contributedby2023.12.15.csv", header=T, na.strings = "", )
+# clean out extra rows and extra columns
+pvs1 <- pvs1[which(!is.na(pvs1$Contributor)),-grep("^X", colnames(pvs1))]
+#pvs <- read.csv("data/ContributedData/PV_for_RS_metaanalysis_20231121.csv", header=T, na.strings = "", )
+#pvs <- read.csv("data/ContributedData/PV_for_RS_metaanalysis_20220716.csv", header=T, na.strings = "", )
+
+# second round of data submissions
+pvs2 <- read.csv("data/ContributedData/PV_for_RS_metaanalysis_2024datacontributions_202400807.csv", header=T, na.strings = "", )[-c(2:5),] # get rid of first 4 demo rows
+# clean out extra rows
+pvs2 <- pvs2[which(!is.na(pvs2$Contributor)),-grep("^X", colnames(pvs2))]
+
+
+
+# rename the column names to get rid of weird characters and stuff
+colnames(pvs1) <- c("Contributor","Species","Treatment","Co.auth"
+                   ,"Biome","Growth.Form","T.S.L.H","Ever.Decid"
+                   ,"Wild.Garden","Life.Stage"
+                   ,"TLP","TLS.sd","TLP.se"
+                   , "totRWCtlp", "totRWCtlp.sd","totRWCtlp.se"
+                   , "LMA", "LMA.sd","LMA.se"
+                   ,"SWC", "SWC.sd", "SWC.se"
+                   ,"CFT.mol.m2","CFT.sd","CFT.se","Po","E","ApoFrac"
+                   ,"sympRWCtlp","Psi.PD","Psi.min","Lat","Lon", "Elev"
+                   ,"Site.Name","Rehydrated","Month","Year","OtherEnv"
+                   ,"Methods.Notes","Ref","Other.Notes")
+
+colnames(pvs2) <- c("Contributor","Species","Treatment","Co.auth"
+                   ,"Biome","Growth.Form","T.S.L.H","Ever.Decid"
+                   ,"Wild.Garden","Life.Stage"
+                   ,"TLP","TLS.sd","TLP.se"
+                   , "totRWCtlp", "totRWCtlp.sd","totRWCtlp.se"
+                   , "LMA", "LMA.sd","LMA.se"
+                   ,"SWC", "SWC.sd", "SWC.se"
+                   ,"CFT.mol.m2","CFT.sd","CFT.se","Po","E","ApoFrac"
+                   ,"sympRWCtlp","Psi.PD","Psi.min","Lat","Lon", "Elev"
+                   ,"Site.Name","Rehydrated","Month","Year","OtherEnv"
+                   ,"Methods.Notes","Ref","Other.Notes")
+
+# combine submission batches
+pvs <- rbind(pvs1, pvs2)
+pvs$LMA <- as.numeric(pvs$LMA)
+pvs$Lat <- as.numeric(pvs$Lat)
+pvs$Lon <- as.numeric(pvs$Lon)
+
+
+
+# fix LMA values that are in g cm2
+pvs$LMA[which(pvs$LMA<1)] <- pvs$LMA[which(pvs$LMA<1)] * 100 * 100
+# fix expanded Biomes
+pvs$Biome[which(pvs$Biome=="TemperateConifer (but could be montane conifer…)")] <- "TemperateConifer"
+pvs$Biome[which(pvs$Biome=="semiarid grassland (MAP 397 mm, MAT 8 C)")] <- "Grassland"
+pvs$Biome[which(pvs$Biome=="Tropical montane cloud forest")] <- "TropicalMoist"
+pvs$Biome[which(pvs$Biome=="Crop ")] <- "Crop"
+pvs$Biome[which(pvs$Biome=="Coastal")] <- "Med/TempDry"
+
+
+pvs$Life.Stage[which(pvs$Life.Stage=="Se (but see Age column)")] <- "Se" # making 3yr olds into seedlings (<1.3m tall)
+pvs$Ever.Decid[which(pvs$Ever.Decid=="Dd/Semi-Deciduous")] <- "DD" # currenlty calling semi-deciduous full drought deciduous
+
+# fix T.S.L.H before I added herbaceous
+pvs$T.S.L.H[which(pvs$Growth.Form=="H")] <- "H"
+
+
+# fix TLPs that are positive rather than negative
+pvs$TLP[which(pvs$TLP>0)] <- -1 * pvs$TLP[which(pvs$TLP>0)]
+
+# Some totRWC_tlp are VERY weird. 
+# in MB12 there aren't any <70% (but only 89)
+# in mb14w there 3 (dry) and 4 (wet) RWC_tlps lower than 70, but only 1 lower than 50 (wet)
+# and nothing <60% for mb14c
+#hist(pvs$totRWCtlp,breaks=50)
+#hist(mb14w$RWC_tlpwet, col="red", add=T)
+#hist(mb12$RWC_tlp, col="blue", add=T)
+#hist(mb14c$RWC_total_wet_percent, col="green", add=T)
+
+# everything below 50 seems to be either a typo or bad.
+pvs$Other.Notes[which(pvs$totRWCtlp<50)] <- paste("BAD totRWCtlp", pvs$Other.Notes[which(pvs$totRWCtlp<50)] )
+#pvs$totRWCtlp.se[which(pvs$totRWCtlp<50)] # and one has a massive SD so prob bad curves?
+pvs$totRWCtlp[which(pvs$totRWCtlp<50)] <- NA 
+# LMAs look good (lots of high ones, but those are Sequoiadendron, which scans with TRY)
+# SWC - two look unusually high (>10). but according to TRY those aren't SUPER crazy, just pretty crazy. One is the Eugenia procera with -13% totRWCtlp though, so maybe just remove this one?
+  # on further exploration, they're both probably bad. They're normalish plants and all TRY extreme SWC plants are majore weirdos.
+pvs$Other.Notes[which(pvs$SWC>10)] <- paste("BAD SWC,", pvs$Other.Notes[which(pvs$SWC>10)])
+pvs$SWC[which(pvs$SWC>10)] <- NA
+# switch osmotic potential to be negative
+pvs$Po[which(pvs$Po>0)] <- -1*pvs$Po[which(pvs$Po>0)]
+# palms/ferns have high E in mb12 (60-80), so values 60-90 don't look like obvious bummers.
+# but E>300 for Forsteronia spicata seems like a data error
+pvs$Other.Notes[which(pvs$E>300)] <- paste("BAD ModE,", pvs$Other.Notes[which(pvs$E>300)])
+pvs$E[which(pvs$E>300)] <- NA
+# Apoplastic Fraction: mb12 median ~0.2
+  # but we've got some negative ones and some >1s. even some >100s. I think I'll have to treat all of them as bad and double check with Danielle Ulrich about them
+  # negative numbers are all from oaks and noted as bad
+pvs$Other.Notes[which(pvs$ApoFrac>1 | pvs$ApoFrac<0)] <- paste("BAD ApoFrac,",pvs$Other.Notes[which(pvs$ApoFrac>1 | pvs$ApoFrac<0)] )
+pvs$ApoFrac[which(pvs$ApoFrac>1 | pvs$ApoFrac<0)] <- NA
+# clean rehydrated method flag
+pvs$Rehydrated[which(pvs$Rehydrated=="no")] <- "N"
+pvs$Rehydrated[which(pvs$Rehydrated=="yes")] <- "Y"
+pvs$Rehydrated[which(pvs$Rehydrated=="Yes")] <- "Y"
+#pvs$Rehydrated[which(pvs$Rehydrated=="no (predawn)")] <- "PD
+
+
+```
+
+*Data quality notes: To Double Check
+Danielle Ulrich - apoplastic fractions >1, German Vargas - Species with crazy totRWCtlp and other values,Chris M. Smith-Martin - CFT calculation off.
+
+
+
+
+``` {r calculate some desired quantities}
+# calculate the g of h20 per m2 of leaf area at full saturation
+pvs$SWA <- pvs$SWC * pvs$LMA
+# calculate the g of h20 per m2 leaf area at tlp
+pvs$LWAtlp <-pvs$SWA * pvs$totRWCtlp /100
+# calculate the water lost per m2 leaf area between saturation and tlp
+pvs$water_loss.m2 <- with(pvs, SWA - LWAtlp)
+# turn capacitance into g instead of mol
+pvs$CFT.g.m2 <- pvs$CFT.mol.m2 * 18.01528
+  #NOTE: Some of these are VERY different than calcualting it myself... (water_loss.m2/(-1*TLP))
+pvs$CFT.g.m2_mycalc <- pvs$water_loss.m2/(-1*pvs$TLP)
+#plot(CFT.g.m2_mycalc~CFT.g.m2, pvs, xlim=c(0,2.5), ylim=c(0,20))
+  # looks like all points except one with reported CFT<3 are in different units, and 3 points with CFT 4-6 are in different units. but its not a simple mol->g conversion. nor cm2->m2.
+  # all of the ones with a unit offset are Chris M. Smith-Martin's will roll with my calc for those.
+pvs$CFT.g.m2[which(pvs$Contributor=="Chris M. Smith-Martin")] <- pvs$CFT.g.m2_mycalc[which(pvs$Contributor=="Chris M. Smith-Martin")]
+pvs$Other.Notes[which(pvs$Contributor=="Chris M. Smith-Martin")] <- paste("CFT_recalced,", pvs$Other.Notes[which(pvs$Contributor=="Chris M. Smith-Martin")])
+
+# we could just use my calc for everything except where I can't calc it myself? --> there are 19 CFTs that I have calcs for that aren't contributed and ~80 that are contributed that I can't calc.
+pvs$CFT.g.m2[which(pvs$CFT.g.m2_mycalc>0)] <- pvs$CFT.g.m2_mycalc[which(pvs$CFT.g.m2_mycalc>0)]
+
+
+```
+
+``` {r summarize dataset}
+print(paste("Number of entries in Contributed Data:", nrow(pvs)))
+print(paste("Number of species:", length(unique(pvs$Species))))
+hist(xtabs(~Species, pvs), breaks=150, xlim=c(0,20), xlab="entries per species", main="")
+print(paste("Number of species with >5 entries:", length(which(xtabs(~Species, pvs)>5))))
+print(paste("Number of species with >50 entries:", length(which(xtabs(~Species, pvs)>50))))
+print(paste("Number of unique 'sites':",length(unique(pvs$Site.Name))))
+print("Where traits were measured:")
+xtabs(~Wild.Garden ,pvs)
+maps::map(database="world", col="black")
+points(Lat~Lon, pvs, pch=16, cex=.5, col="green")
+mtext("Contributed Curves",side=3)
+```
+
+
+No real representation outside of the Americas at present.
+
+Number of entries with complete trait values:
+```{r more summaries, echo=FALSE}
+apply(pvs %>% select(TLP,totRWCtlp,LMA,SWC,SWA,LWAtlp,CFT.mol.m2,water_loss.m2,CFT.g.m2,CFT.g.m2_mycalc)
+      , MARGIN = 2
+      ,FUN = function(x){length(which(!is.na(x)))})
+```
+-**totRWCtlp** = relative water content at TLP
+
+-**SWC** = g water per g leaf dry mass at full saturation
+
+-**CFT...** = leaf capacitance per m2 leaf area
+
+-**water_loss.m2** = total g water lost per m2 leaf area going from full sutration to TLP (calculated above)
+
+-**SWA** = g water per m2 leaf at full saturation
+
+-**LWCtlp** = g water per m2 leaf area at TLP (LWA at TLP)
+
+
+
+
+### Bring in Data from Bartlett Meta-analyses ###
+We'll bring in Megan's published meta-analyses from Bartlett et al. 2012 and Bartlett et al. 2014.
+However, these only have RWCtlp and sometimes LMA, and we need SWC (or LDMC) to transform these curves into absolute gH2O per mass or area.
+So I pulled all the LMA and LDMC data from TRY to infill with species average data where I can.
+```{r import data, include=F}
+# data from Bartlett 2012 ELE
+mb12raw <- read.csv("data/params/Bartlett2012ELE.csv", header=T) 
+  # make clean version with all rows with both TLP and RWC_tlp values
+mb12 <- mb12raw[which(mb12raw$TLP<0 & mb12raw$RWC_tlp>0),]
+  # relevel things so that empty levels don't use all my colors
+mb12$Biome <- factor(mb12$Biome)
+mb12$Biome <- relevel(mb12$Biome, ref="Temperate")
+mb12$Biome <- relevel(mb12$Biome, ref="TropicalDry")
+
+# Bartlett 2014 ELE wild plants
+mb14wraw <- read.csv("data/params/Bartlett2014ELE_wild.csv") # data from 
+mb14wraw <- mb14wraw %>% rename(TLPwet=TLP_WET_MPa, TLPdry=TLP_DRY_MPa, RWC_tlpwet=RWC_total_wet_percent, RWC_tlpdry = RWC_total_dry_percent)
+mb14w <- mb14wraw[which(mb14wraw$RWC_tlpwet>0),]
+mb14c <- read.csv("data/params/Bartlett2014ELE_S3crop.csv")
+
+# Data from Hahm 2018 Ecosphere
+qgar <- read.csv("data/params/Hahm_2018_Ecosphere_Quercusgarryana_20210115.csv")
+  # a number of empty rows came in at the end, so kill those
+qgar <- qgar[which(!is.na(qgar$Tree.ID)),]
+  # relevel the 'rehydration' column so it doesn't have an empty NA level
+qgar$Rehydration <- factor(qgar$Rehydration)
+qgar$LMA <- with(qgar, Dry_mass/Fresh_area)
+
+## Data from Holtzman et al. 2021 from Harvard Forest
+hf <- read.csv("data/raw_RWC-Psi/Holtzman_HarvardForest_rawPVcurves_20200304.csv"
+)
+hf$type <- factor(hf$type)
+
+## example curves from Cam for illustration
+ecs <- readxl::read_xlsx(path = "data/ContributedData/ExampleCurves_MeganAndCam.xlsx", sheet = 2, skip = 1)
+ecs$g_h20_m2 <- ecs$Mass_h2o/ecs$Fresh_area_m2 # calculate the total water per m2 leaf area (g water / leaf area in m2)
+
+# just verifying that the above works with the actual math
+# test <- ecs$SWC * ecs$`Dry mass`/ecs$Fresh_area_m2 * ecs$RWC # it does! good.
+
+
+
+```
+
+
+
+
+```{r adding SLA, include=F}
+#read in TRY species averages (from Cd-TRY_LMALDMC_processing)
+SLAspp <- read.csv("DerivedData/TRY_SpeciesAverages_20230719.csv", header=T, row.names =1 )
+
+
+# add a SLA column from TRY
+mb12$SLA <- SLAspp$SLA[match(mb12$Species, SLAspp$AccSpeciesName)] # fills in 50 spp
+# add a column to keep track of which traits got imputed from TRY
+mb12$LMA_imputed <- 0
+mb12$LMA_imputed[which(is.na(mb12$LMA))] <- 1
+mb12$LMA[which(is.na(mb12$LMA))] <- 1/mb12$SLA[which(is.na(mb12$LMA))]*1000  # wohoo! fills in a whopping 20 spp...
+mb12$SWC <- SLAspp$SWC[match(mb12$Species, SLAspp$AccSpeciesName)] # fills in 0 spp
+mb12$SWC <- SLAspp$SWC_from_LDMC[match(mb12$Species, SLAspp$AccSpeciesName)] # only fills in 24 spp. Dang. But at least all 24 of them have LMA values!
+mb12$SWC_imputed <- 1
+
+## assign a single LMA and single SWC to both seasons of mb14 dataset
+
+mb14w$LMA <- 1/SLAspp$SLA[match(mb14w$Species, SLAspp$AccSpeciesName)]*1000 # get 53 spp out of it
+mb14w$SWC <- SLAspp$SWC_from_LDMC[match(mb14w$Species, SLAspp$AccSpeciesName)] # get an additional 27 species out of it. All of them with both LMA and SWC
+# assign Eucalyptus rubida the mean SWC for non-weird Eucs (there's one study with RIDICULOUSLY high LDMCs in TRY (>0.8, meaning 0.16 SWC), which must be methodological)
+eucLDMCs <- SLAspp[c(grep("Eucalyptus",SLAspp$AccSpeciesName), grep("Corymbia", SLAspp$AccSpeciesName)),] %>% filter(LDMC<.7) %>% select(LDMC)
+
+mb14w$SWC[which(mb14w$Species=="Eucalyptus rubida")] <-1/mean(eucLDMCs$LDMC)-1
+# but actually only 21 because 6 are missing totRWCtlp
+mb14w$LMA_imputed <- 1
+mb14w$SWC_imputed <- 1
+
+mb14c$LMA <- 1/SLAspp$SLA[match(mb14c$Species, SLAspp$AccSpeciesName)]*1000  # get 37 spp
+mb14c$SWC <- SLAspp$SWC_from_LDMC[match(mb14c$Species, SLAspp$AccSpeciesName)]
+  # get 29 species out of it with both LMA and SWC
+mb14c$LMA_imputed <- 1
+mb14c$SWC_imputed <- 1
+
+# clean up the columns to get ready to merge
+mb12clean <- mb12 %>% filter(TLP<0 & RWC_tlp>0 & LMA>0 & SWC>0) %>% select(Species, Biome, "Growth.Form"=GrowthForm, "Ever.Decid"=Ever_Decid, TLP, "totRWCtlp"=RWC_tlp, LMA, SWC,"Po"=Pot_osmot,"E"=Mod_elast,"ApoFrac"=Apo_frac,"sympRWCtlp"=RWC_symp_tlp,"Ref"=Reference, LMA_imputed, SWC_imputed)
+mb12clean$Treatment <- NA
+mb12clean$T.S.L.H <- NA
+mb12clean$Wild.Garden <- NA
+mb12clean$Life.Stage <- NA
+mb12clean$Psi.PD <- NA
+mb12clean$Psi.min <- NA
+mb12clean$Rehydrated <- NA
+mb12clean$Lat <- NA
+mb12clean$Lon <- NA
+mb12clean$Elev <- NA
+# calculate the g of h20 per m2 of leaf area at full saturation
+mb12clean$SWA <- mb12clean$SWC * mb12clean$LMA
+# calculate the g of h20 per m2 leaf area at tlp
+mb12clean$LWAtlp <-mb12clean$SWA * mb12clean$totRWCtlp /100
+# calculate the water lost per m2 leaf area between saturation and tlp
+mb12clean$water_loss.m2 <- with(mb12clean, SWA - LWAtlp)
+# calculate capacitance, g H2o m-2 MPa-1
+mb12clean$CFT.g.m2 <- mb12clean$water_loss.m2/(-1*mb12clean$TLP) #mb12clean$CFT.mol.m2 * 18.01528
+mb12clean$Other.Notes <- NA
+mb12clean$Treatment <- NA
+mb12clean$Dataset <- "mb12"
+
+# process and arrange mb14 wild dataset
+mb14wclean <- mb14w %>% filter(TLPwet<0 & RWC_tlpwet>0 & LMA>0 & SWC>0)%>% select(Species, "Biome"=Biomes, "Growth.Form"=Woody_Herbaceous, "Ever.Decid"=Evergreen_Deciduous_Herb, "TLP"=TLPwet, "totRWCtlp"=RWC_tlpwet,"Po"=OsmoticPotential_WET_MPa, LMA, SWC,"Ref"=Reference, LMA_imputed, SWC_imputed, TLPdry, "totRWCtlpdry"=RWC_tlpdry, "Podry"=OsmoticPotential_DRY_MPa, "Lat"=Site_Latitude, "Lon" = Site_Longitude)
+# hack together a long form with dry values
+mb14wdry <- mb14wclean %>% select(-TLP,-totRWCtlp, -Po)
+colnames(mb14wdry)<- str_remove(colnames(mb14wdry),"dry")
+mb14wwet <- mb14wclean %>% select(-grep("dry", colnames(mb14wclean)))
+mb14wdry <- mb14wdry %>% select(colnames(mb14wwet))
+mb14wwet$Treatment <- "Wet"
+mb14wdry$Treatment <- "Dry"
+mb14wc <- rbind(mb14wwet, mb14wdry)
+
+mb14wc$ApoFrac <- NA
+mb14wc$sympRWCtlp <- NA
+mb14wc$Treatment <- NA
+mb14wc$T.S.L.H <- NA
+mb14wc$Wild.Garden <- NA
+mb14wc$Life.Stage <- NA
+mb14wc$Psi.PD <- NA
+mb14wc$Psi.min <- NA
+mb14wc$Rehydrated <- NA
+mb14wc$Elev <- NA
+# calculate the g of h20 per m2 of leaf area at full saturation
+mb14wc$SWA <- mb14wc$SWC * mb14wc$LMA
+# calculate the g of h20 per m2 leaf area at tlp
+mb14wc$LWAtlp <-mb14wc$SWA * mb14wc$totRWCtlp /100
+# calculate the water lost per m2 leaf area between saturation and tlp
+mb14wc$water_loss.m2 <- with(mb14wc, SWA - LWAtlp)
+# calculate capacitance, g H2o m-2 MPa-1
+mb14wc$CFT.g.m2 <- mb14wc$water_loss.m2/(-1*mb14wc$TLP) #mb14wc$CFT.mol.m2 * 18.01528
+mb14wc$Other.Notes <- NA
+mb14wc$Dataset <- "mb14"
+
+# process and arrange mb14 crop dataset
+mb14cclean <- mb14c %>% filter(TLP_WET_MPa<0 & RWC_total_wet_percent>0 & LMA>0 & SWC>0) %>% select(Species, "Biome"=Biome, "Growth.Form"=Woody_Herbaceous, "Ever.Decid"=Evergreen_Deciduous_Herb, "TLP"=TLP_WET_MPa, "totRWCtlp"=RWC_total_wet_percent,"Po"=OsmoticPotential_WET_MPa, LMA, SWC,"Ref"=Reference, LMA_imputed, SWC_imputed, "TLPdry"=TLP_DRY_MPa, "totRWCtlpdry"=RWC_total_dry_percent, "Podry"=OsmoticPotential_DRY_MPa, "Other.Notes"=Cultivar)
+# hack together a long form with dry values
+mb14cdry <- mb14cclean %>% select(-TLP,-totRWCtlp, -Po)
+colnames(mb14cdry)<- str_remove(colnames(mb14cdry),"dry")
+mb14cwet <- mb14cclean %>% select(-grep("dry", colnames(mb14cclean)))
+mb14cdry <- mb14cdry %>% select(colnames(mb14cwet))
+mb14cwet$Treatment <- "Wet"
+mb14cdry$Treatment <- "Dry"
+mb14cc <- rbind(mb14cwet, mb14cdry)
+
+mb14cc$ApoFrac <- NA
+mb14cc$sympRWCtlp <- NA
+mb14cc$Treatment <- NA
+mb14cc$T.S.L.H <- NA
+mb14cc$Wild.Garden <- NA
+mb14cc$Life.Stage <- NA
+mb14cc$Psi.PD <- NA
+mb14cc$Psi.min <- NA
+mb14cc$Rehydrated <- NA
+mb14cc$Lat <- NA
+mb14cc$Lon <- NA
+mb14cc$Elev <- NA
+# calculate the g of h20 per m2 of leaf area at full saturation
+mb14cc$SWA <- mb14cc$SWC * mb14cc$LMA
+# calculate the g of h20 per m2 leaf area at tlp
+mb14cc$LWAtlp <-mb14cc$SWA * mb14cc$totRWCtlp /100
+# calculate the water lost per m2 leaf area between saturation and tlp
+mb14cc$water_loss.m2 <- with(mb14cc, SWA - LWAtlp)
+# calculate capacitance, g H2o m-2 MPa-1
+mb14cc$CFT.g.m2 <- mb14cc$water_loss.m2/(-1*mb14cc$TLP) #mb14cc$CFT.mol.m2 * 18.01528
+mb14cc$Dataset <- "mb14"
+
+# get everything to have the same column order as mb14wc
+mb12clean <- mb12clean %>% select(colnames(mb14wc))
+mb14cc <- mb14cc %>% select(colnames(mb14wc))
+```
+
+So net result of TRY + mb12 and mb14 datasets is 72 additional species and 120 total values (w and dry for mb14 datasets) I'll take it.
+
+
+Combining all things into  master dataset, we don't get all the metadata we'd like for all the studies, but we increase the # spp and geographic spread
+- Let's analyze the relationship between parameters on the full dataset, and then we can explore specific patterns in depth in the contributed dataset with covariates that we don't have for the full dataset
+```{r make master dataset, include=F}
+pvs$LMA_imputed <- 0
+pvs$SWC_imputed <- 0
+pvs$Dataset <- "Contributed"
+pvs.master <- pvs %>% select(colnames(mb14wc))
+pvs.master$LMA_imputed[which(is.na(pvs.master$LMA))] <- 1
+pvs.master$LMA[which(is.na(pvs.master$LMA))] <- 1/SLAspp$SLA[match(pvs.master$Species[which(is.na(pvs.master$LMA))], SLAspp$AccSpeciesName)]*1000
+pvs.master$SWC_imputed[which(is.na(pvs.master$SWC))] <- 1
+pvs.master$SWC[which(is.na(pvs.master$SWC))] <- SLAspp$SWC_from_LDMC[match(pvs.master$Species[which(is.na(pvs.master$SWC))], SLAspp$AccSpeciesName)]
+# fill in missing values with imputed traits
+pvs.master$SWA <- pvs.master$SWC * pvs.master$LMA 
+#length(which(is.na(pvs$SWA)& pvs.master$SWA>0))# fills in 160 values for all three of these
+# calculate the g of h20 per m2 leaf area at tlp
+pvs.master$LWAtlp <-pvs.master$SWA * pvs.master$totRWCtlp /100
+# calculate the water lost per m2 leaf area between saturation and tlp
+pvs.master$water_loss.m2 <- with(pvs.master, SWA - LWAtlp)
+# calculate the Capacitance (CFT) for 83 rows without it
+pvs.master$CFT.g.m2[which(is.na(pvs.master$CFT.g.m2))] <- pvs.master$water_loss.m2[which(is.na(pvs.master$CFT.g.m2))]/(-1*pvs.master$TLP[which(is.na(pvs.master$CFT.g.m2))])
+
+
+apply(pvs.master %>% select(TLP,totRWCtlp,LMA,SWC,water_loss.m2,CFT.g.m2), MARGIN = 2 ,FUN = function(x){length(which(!is.na(x)))}) - apply(pvs %>% select(TLP,totRWCtlp,LMA,SWC,water_loss.m2,CFT.g.m2) , MARGIN = 2 ,FUN = function(x){length(which(!is.na(x)))})
+  #infilled 220 LMAs, 1 SWC, 160 water_loss.m2 and 199 CFT.g.m2
+
+
+
+fullpvs <- rbind(pvs.master, mb12clean, mb14wc, mb14cc)
+
+fullpvs$RWCslope <- fullpvs$TLP*(100- fullpvs$totRWCtlp)
+
+
+```
+
+# MASTER DATASET SUMMARY
+``` {r summarize master dataset}
+print(paste("Number of entries:", nrow(fullpvs)))
+print(paste("Number of species:", length(unique(fullpvs$Species)))) # added 46 spp
+hist(xtabs(~Species, fullpvs), breaks=150, xlim=c(0,20), xlab="entries per species", main="") 
+print(paste("Number of species with >5 entries:", length(which(xtabs(~Species, fullpvs)>5)))) # added 4 spp with multiple entries
+print(paste("Number of species with >50 entries:", length(which(xtabs(~Species, fullpvs)>50))))
+print(paste("Number of unique 'sites':",length(unique(fullpvs$Site.Name))))
+print("Where traits were measured:")
+xtabs(~Wild.Garden ,fullpvs)
+maps::map(database="world", col="black")
+locs <- fullpvs %>% group_by(Lat, Lon) %>% summarise(nCurves = n(), nSpecies=length(unique(Species)))
+points(Lat~Lon, locs, pch=16, cex=sqrt(nSpecies/pi)/2, col="green")
+mtext("Full Dataset (size = n species)")
+mtext(paste("plus", length(which(is.na(fullpvs$Lat)))," obs and",length(unique(fullpvs$Species[which(is.na(fullpvs$Lat))])), "spp without locations"), side=1, cex=.8)
+```
+\
+So we've got a ton of coverage in the Americas, and remarkably good spp coverage in the new world tropics. But outside of that we're pretty sparse.
+
+
+
+``` {r average to spp, include=F}
+
+fullpvs$Ever.Decid[which(fullpvs$Growth.Form=="H" & is.na(fullpvs$Ever.Decid))] <- "H" # call anything that's not woody H for ever/decid because it's hard to tell for perrenials and grasses and stuff. There are some E's and some "H"s (inherited from mb12).
+fullpvs$Ever.Decid[which(fullpvs$Species=="Celtis australis")] <- "CD" # just D in mb12
+fullpvs$Ever.Decid[which(fullpvs$Species=="Cordia collococca")] <- "DD" # just D in mb12
+fullpvs$Biome[which(fullpvs$Species=="Cordia collococca")] <- "TropicalMoist" # both Dry and Moist
+fullpvs$Biome[which(fullpvs$Species=="Eucalyptus rubida")] <- "Med/TempDry" # Temperate in mb12 but Med/TempDry in mb14
+fullpvs$Ever.Decid[which(fullpvs$Species=="Paullinia pinnata")] <- "DD" # called E in the garden but DD in the wild... going with DD
+#fullpvs[which(fullpvs$Species=="Phaseolus vulgaris"),]
+fullpvs$Ever.Decid[which(fullpvs$Species=="Quercus rubra")] <- "CD"
+fullpvs$Ever.Decid[which(fullpvs$Species=="Tetracera volubilis")] <- "DD" # called both E and DD in contributed data
+fullpvs$Ever.Decid[which(fullpvs$Species=="Trigonia rugosa")] <- "DD" # called both E and DD in contributed data
+#fullpvs[which(fullpvs$Species=="Triticum aestivum"),]
+fullpvs$Biome[which(fullpvs$Species=="Vitis vinifera")] <- "Crop" # called "Crop" and "Med/TempDry" AND "CD"/"E"/"D"
+fullpvs$Ever.Decid[which(fullpvs$Species=="Vitis vinifera")] <- "CD"
+# Currently rolling with "CD" for all mb "D" species
+fullpvs$Ever.Decid[which(fullpvs$Ever.Decid=="D")] <- "CD" # most of them DO seem CD
+
+
+
+# I realized it's probably worth looking at things on a mass vs area basis, so calculating water loss per g leaf as well as m2
+fullpvs$water_loss.g <- fullpvs$SWC - fullpvs$totRWCtlp*fullpvs$SWC
+  # SWC = gwater/g dry mass @ sat. 
+
+fullspp <- fullpvs %>% group_by(Species, Biome, Growth.Form, Ever.Decid) %>% summarise(TLP = -1*mean(TLP, na.rm=T),
+                                                                                                   totRWCtlp = mean(totRWCtlp, na.rm=T),
+                                                                                                   Po = mean(Po, na.rm=T),
+                                                                                                   LMA = mean(LMA, na.rm=T),
+                                                                                                   SWC = mean(SWC, na.rm=T),
+                                                                                                   LMA_imputed = max(LMA_imputed),
+                                                                                                   SWC_imputed = max(SWC_imputed),
+                                                                                                   ApoFrac = mean(ApoFrac, na.rm=T),
+                                                                                                   SWA = mean(SWA, na.rm=T),
+                                                                                                   LWAtlp = mean(LWAtlp, na.rm=T),
+                                                                                                   water_loss.m2 = mean(water_loss.m2, na.rm=T),
+                                                                                                   CFT.g.m2 = mean(CFT.g.m2, na.rm=T),
+  water_loss.g = mean(water_loss.g, na.rm=T),
+                                                                                                   n_vals = n(), nDatasets=n_distinct(Dataset), Dataset = unique(Dataset)[1], T.S.L.H = unique(na.omit(T.S.L.H))[1]
+                                                                                     )
+
+fullspp <- fullspp[which(!is.na(fullspp$Species)),] 
+
+# Some species have multiple values for E/D or Biome
+  #  Celtis australis   Cordia collococca   Eucalyptus rubida        Oryza sativa 
+  #                 2                   2                   2                   2 
+  # Paullinia pinnata  Phaseolus vulgaris       Quercus rubra Tetracera volubilis 
+  #                 2                   2                   2                   2 
+  #   Trigonia rugosa   Triticum aestivum      Vitis vinifera 
+  #                 2                   2                   3 
+```
+
+
+
+
+               
+``` {r editing master}
+# cleaning and adding in family info
+# bin some of the low n biomes
+fullspp$Biome[which(fullspp$Biome %in% c("Coastal","SemiDesert","Tundra"))] <- "Other"
+
+#***NOTE: I switch the sign on TLP for ease of plotting!
+
+# require(taxize)
+# family.itis <- data.frame("db"=rep(NA, nrow(fullspp)),"query"=rep(NA, nrow(fullspp)), "family"=rep(NA, nrow(fullspp)))
+# for( i in 1:nrow(fullspp)){
+#   family.itis[i,] <- unlist(tax_name(fullspp$Species[i],get="family",db="itis"))
+# } 
+# # bonks on Larix decidua [183]
+# family.itis$query[183] <- "Larix decidua"
+# family.itis$family[183]="Pinaceae"
+# 
+# # second time bonks at 162
+# # family.itis$query[162] <- "Polystichum munitum"
+# # family.itis$family[162] <- "Dryopteridaceae"
+# 
+# #  for( i in 184:nrow(fullspp)){
+# #    family.itis[i,] <- unlist(tax_name(fullspp$Species[i],get="family",db="itis"))
+# #  }
+# # 
+# # family.itis1 <- family.itis
+# # family.itis$query[183] <- "Polystichum munitum"
+# # 
+# # family.itis$query[183] <- "Polystichum munitum"
+# # family.itis$family[162] <- "Dryopteridaceae"
+# # for( i in 163:nrow(fullspp)){
+# #   family.itis[i,] <- unlist(tax_name(fullspp$Species[i],get="family",db="itis"))
+# # }
+# 
+# # fullspp$Species[162]
+# # family.itis1$query <- fullspp$Species
+# #write.csv(family.itis, "DerivedData/Family_lookuptable_ITIS_20240812.csv")
+# missing <- family.itis1$query[which(is.na(family.itis1$family))]
+# family.ncbi <- data.frame("db"=rep(NA, length(missing)),"query"=rep(NA, length(missing)), "family"=rep(NA, length(missing)))
+# for(i in 1:length(missing)){
+#   family.ncbi[i,] <- unlist(tax_name(missing[i],get="family",db="ncbi"))
+# }
+# # for(i in 19:length(missing)){
+# #   family.ncbi[i,] <- unlist(tax_name(missing[i],get="family",db="ncbi"))
+# # }
+# # for(i in 27:length(missing)){
+# #   family.ncbi[i,] <- unlist(tax_name(missing[i],get="family",db="ncbi"))
+# #}
+# 
+# family.itis$family[which(is.na(family.itis$family))] <- family.ncbi$family[match(family.itis$query[which(is.na(family.itis$family))], family.ncbi$query)]
+# 
+# #write.csv(family.itis, "DerivedData/Family_lookuptable_ITIS-NCBI_20230802.csv")
+# write.csv(family.itis, "DerivedData/Family_lookuptable_ITIS-NCBI_20240812.csv")
+
+family.itis <- read.csv("DerivedData/Family_lookuptable_ITIS-NCBI_20240812.csv")
+
+# add in Families to spp average and full dataset
+fullspp$Family <- family.itis$family[match(fullspp$Species,family.itis$query)]
+fullspp$Genus <- str_split_i(fullspp$Species," ", 1)
+fullspp$Species_name <- str_split_i(fullspp$Species," ", -1)
+fullpvs$Family <- family.itis$family[match(fullpvs$Species,family.itis$query)]
+fullpvs$Genus <- str_split_i(fullpvs$Species," ", 1)
+fullpvs$Species_name <- str_split_i(fullpvs$Species," ", -1)
+
+
+# gymnosperm families
+gymnos <- c("Araucariaceae",
+"Cupressaceae",
+"Gnetaceae",
+"Pinaceae",
+"Podocarpaceae",
+"Taxaceae",
+"Taxodiaceae",
+"Zamiaceae")
+
+fullspp$Gymno.Angio <- "Angiosperm"
+fullspp$Gymno.Angio[which(fullspp$Family %in% gymnos)] <- "Gymnosperm"
+
+fullpvs$Gymno.Angio <- "Angiosperm"
+fullpvs$Gymno.Angio[which(fullpvs$Family %in% gymnos)] <- "Gymnosperm"
+
+# Remove CFT and water_loss of Picea mariana because it's MAJ outlier
+fullspp$CFT.g.m2[which(fullspp$Species=="Picea mariana")] <- NA
+fullspp$water_loss.m2[which(fullspp$Species=="Picea mariana")] <- NA
+
+
+
+fullfam <- fullspp %>% group_by(Family, Gymno.Angio) %>% summarise(TLP = -1*mean(TLP, na.rm=T),
+                                                                                                   totRWCtlp = mean(totRWCtlp, na.rm=T),
+                                                                                                   Po = mean(Po, na.rm=T),
+                                                                                                   LMA = mean(LMA, na.rm=T),
+                                                                                                   SWC = mean(SWC, na.rm=T),
+                                                                                                   LMA_imputed = max(LMA_imputed),
+                                                                                                   SWC_imputed = max(SWC_imputed),
+                                                                                                   ApoFrac = mean(ApoFrac, na.rm=T),
+                                                                                                   SWA = mean(SWA, na.rm=T),
+                                                                                                   LWAtlp = mean(LWAtlp, na.rm=T),
+                                                                                                   water_loss.m2 = mean(water_loss.m2, na.rm=T),
+                                                                                                   CFT.g.m2 = mean(CFT.g.m2, na.rm=T),
+  water_loss.g = mean(water_loss.g, na.rm=T),                                                       n_vals = n()  )
+
+
+
+
+
+```
+
+Still missing 50 families somehow, but will go back and fix those
+
+
+
+``` {r missing metadata}
+
+apply(fullspp, MARGIN=2, FUN = function(x){length(which(is.na(x)))})
+```
+
+# need:
+38 Ever.Decid\
+53 T.S.L.H\
+50 family\
+\
+\
+
+
+``` {r Clean edit data}
+
+```
+
+
+``` {r export derived datasets}
+
+# full observations
+write.csv(fullpvs, "DerivedData/FullObservations_Derived_20241001.csv")
+# species averages
+write.csv(fullspp, "DerivedData/SpeciesAverages_Derived_20241001.csv")
+
+
+
+```
